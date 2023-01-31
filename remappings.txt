@@ -1,2 +1,4 @@
+ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-src/=src/
+v4-core/=lib/v4-core/contracts/
+openzeppelin/=lib/openzeppelin-contracts/contracts/

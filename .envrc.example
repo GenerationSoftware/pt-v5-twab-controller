@@ -26,4 +26,4 @@ export POLYGONSCAN_API_KEY=""
 export FORK_ENABLED=true
 
 # Used to report gas usage when running Forge tests
-export FORGE_GAS_REPORT=true
+# export FORGE_GAS_REPORT=true
