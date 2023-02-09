@@ -2,10 +2,34 @@
 
 pragma solidity 0.8.17;
 
+import "forge-std/console.sol";
+
 import "./ExtendedSafeCastLib.sol";
 import "./OverflowSafeComparatorLib.sol";
 import "./RingBufferLib.sol";
 import "./ObservationLib.sol";
+
+/**
+ * @notice Struct ring buffer parameters for single user Account
+ * @param balance       Current balance for an Account
+ * @param nextTwabIndex Next uninitialized or updatable ring buffer checkpoint storage slot
+ * @param cardinality   Current total "initialized" ring buffer checkpoints for single user AccountDetails.
+ *                          Used to set initial boundary conditions for an efficient binary search.
+ */
+struct AccountDetails {
+  uint112 balance;
+  uint112 delegateBalance;
+  uint16 nextTwabIndex;
+  uint16 cardinality;
+}
+
+/// @notice Combines account details with their twab history
+/// @param details The account details
+/// @param twabs The history of twabs for this account
+struct Account {
+  AccountDetails details;
+  ObservationLib.Observation[365] twabs;
+}
 
 /**
  * @title  PoolTogether V4 TwabLib (Library)
@@ -34,39 +58,42 @@ library TwabLib {
    *             pointers and new observation checkpoints.
    *
    *             The MAX_CARDINALITY in fact guarantees at least 1 year of records:
+
+   *             The SPONSORSHIP_ADDRESS delegates to a dead address.
    */
   uint16 public constant MAX_CARDINALITY = 365; // 1 year
+  address public constant SPONSORSHIP_ADDRESS = address(1); // Dead address
 
-  /**
-   * @notice Struct ring buffer parameters for single user Account
-   * @param balance       Current balance for an Account
-   * @param nextTwabIndex Next uninitialized or updatable ring buffer checkpoint storage slot
-   * @param cardinality   Current total "initialized" ring buffer checkpoints for single user AccountDetails.
-   *                          Used to set initial boundary conditions for an efficient binary search.
-   */
-  struct AccountDetails {
-    uint112 balance;
-    uint112 delegateBalance;
-    uint16 nextTwabIndex;
-    uint16 cardinality;
+  function increaseBalance(
+    Account storage _account,
+    uint112 _amount
+  ) internal view returns (AccountDetails memory accountDetails) {
+    AccountDetails memory _accountDetails = _account.details;
+    _accountDetails.balance = _accountDetails.balance + _amount;
+    accountDetails = _accountDetails;
   }
 
-  /// @notice Combines account details with their twab history
-  /// @param details The account details
-  /// @param twabs The history of twabs for this account
-  struct Account {
-    AccountDetails details;
-    ObservationLib.Observation[MAX_CARDINALITY] twabs;
+  function decreaseBalance(
+    Account storage _account,
+    uint112 _amount,
+    string memory _revertMessage
+  ) internal view returns (AccountDetails memory accountDetails) {
+    AccountDetails memory _accountDetails = _account.details;
+    require(_accountDetails.balance >= _amount, _revertMessage);
+    unchecked {
+      _accountDetails.balance -= _amount;
+    }
+    accountDetails = _accountDetails;
   }
 
-  /// @notice Increases an account's balance and records a new twab.
-  /// @param _account The account whose balance will be increased
-  /// @param _amount The amount to increase the balance by
+  /// @notice Increases an account's delegateBalance and records a new twab.
+  /// @param _account The account whose delegateBalance will be increased
+  /// @param _amount The amount to increase the delegateBalance by
   /// @param _currentTime The current time
   /// @return accountDetails The new AccountDetails
   /// @return twab The user's latest TWAB
   /// @return isNew Whether the TWAB is new
-  function increaseBalance(
+  function increaseDelegateBalance(
     Account storage _account,
     uint112 _amount,
     uint32 _currentTime
@@ -80,20 +107,20 @@ library TwabLib {
   {
     AccountDetails memory _accountDetails = _account.details;
     (accountDetails, twab, isNew) = _nextTwab(_account.twabs, _accountDetails, _currentTime);
-    accountDetails.balance = _accountDetails.balance + _amount;
+    accountDetails.delegateBalance = _accountDetails.delegateBalance + _amount;
   }
 
   /**
-   * @notice Calculates the next TWAB checkpoint for an account with a decreasing balance.
+   * @notice Calculates the next TWAB checkpoint for an account with a decreasing delegateBalance.
    * @dev    With Account struct and amount decreasing calculates the next TWAB observable checkpoint.
-   * @param _account        Account whose balance will be decreased
-   * @param _amount         Amount to decrease the balance by
-   * @param _revertMessage  Revert message for insufficient balance
+   * @param _account        Account whose delegateBalance will be decreased
+   * @param _amount         Amount to decrease the delegateBalance by
+   * @param _revertMessage  Revert message for insufficient delegateBalance
    * @return accountDetails Updated Account.details struct
    * @return twab           TWAB observation (with decreasing average)
    * @return isNew          Whether TWAB is new or calling twice in the same block
    */
-  function decreaseBalance(
+  function decreaseDelegateBalance(
     Account storage _account,
     uint112 _amount,
     string memory _revertMessage,
@@ -108,11 +135,11 @@ library TwabLib {
   {
     AccountDetails memory _accountDetails = _account.details;
 
-    require(_accountDetails.balance >= _amount, _revertMessage);
+    require(_accountDetails.delegateBalance >= _amount, _revertMessage);
 
     (accountDetails, twab, isNew) = _nextTwab(_account.twabs, _accountDetails, _currentTime);
     unchecked {
-      accountDetails.balance -= _amount;
+      accountDetails.delegateBalance -= _amount;
     }
   }
 
@@ -127,7 +154,7 @@ library TwabLib {
    * @param _currentTime    Block.timestamp
    * @return Average balance of user held between epoch timestamps start and end
    */
-  function getAverageBalanceBetween(
+  function getAverageDelegateBalanceBetween(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
@@ -136,7 +163,8 @@ library TwabLib {
   ) internal view returns (uint256) {
     uint32 endTime = _endTime > _currentTime ? _currentTime : _endTime;
 
-    return _getAverageBalanceBetween(_twabs, _accountDetails, _startTime, endTime, _currentTime);
+    return
+      _getAverageDelegateBalanceBetween(_twabs, _accountDetails, _startTime, endTime, _currentTime);
   }
 
   /// @notice Retrieves the oldest TWAB
@@ -176,21 +204,21 @@ library TwabLib {
   /// @param _accountDetails Accounts details
   /// @param _targetTime Timestamp at which the reserved TWAB should be for.
   /// @return uint256 TWAB amount at `_targetTime`.
-  function getBalanceAt(
+  function getDelegateBalanceAt(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _targetTime,
     uint32 _currentTime
-  ) internal view returns (uint256) {
+  ) internal returns (uint256) {
     uint32 timeToTarget = _targetTime > _currentTime ? _currentTime : _targetTime;
-    return _getBalanceAt(_twabs, _accountDetails, timeToTarget, _currentTime);
+    return _getDelegateBalanceAt(_twabs, _accountDetails, timeToTarget, _currentTime);
   }
 
   /// @notice Calculates the average balance held by a user for a given time frame.
   /// @param _startTime The start time of the time frame.
   /// @param _endTime The end time of the time frame.
   /// @return The average balance that the user held during the time frame.
-  function _getAverageBalanceBetween(
+  function _getAverageDelegateBalanceBetween(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
@@ -244,12 +272,12 @@ library TwabLib {
    * @param _currentTime    Block.timestamp
    * @return uint256 Time-weighted average amount between two closest observations.
    */
-  function _getBalanceAt(
+  function _getDelegateBalanceAt(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _targetTime,
     uint32 _currentTime
-  ) private view returns (uint256) {
+  ) private returns (uint256) {
     uint16 newestTwabIndex;
     ObservationLib.Observation memory afterOrAt;
     ObservationLib.Observation memory beforeOrAt;
@@ -257,7 +285,7 @@ library TwabLib {
 
     // If `_targetTime` is chronologically after the newest TWAB, we can simply return the current balance
     if (beforeOrAt.timestamp.lte(_targetTime, _currentTime)) {
-      return _accountDetails.balance;
+      return _accountDetails.delegateBalance;
     }
 
     uint16 oldestTwabIndex;
@@ -316,7 +344,7 @@ library TwabLib {
   ) private view returns (ObservationLib.Observation memory) {
     // If `_targetTimestamp` is chronologically after the newest TWAB, we extrapolate a new one
     if (_newestTwab.timestamp.lt(_targetTimestamp, _time)) {
-      return _computeNextTwab(_newestTwab, _accountDetails.balance, _targetTimestamp);
+      return _computeNextTwab(_newestTwab, _accountDetails.delegateBalance, _targetTimestamp);
     }
 
     if (_newestTwab.timestamp == _targetTimestamp) {
@@ -371,6 +399,7 @@ library TwabLib {
     uint112 _currentBalance,
     uint32 _time
   ) private pure returns (ObservationLib.Observation memory) {
+    // TODO: HERE WE NEED TO HANDLE WHERE WE"RE OVERWRITING RATHER THAN ADDING A NEW.
     // New twab amount = last twab amount (or zero) + (current amount * elapsed seconds)
     return
       ObservationLib.Observation({
@@ -410,10 +439,11 @@ library TwabLib {
 
     ObservationLib.Observation memory newTwab = _computeNextTwab(
       _newestTwab,
-      _accountDetails.balance,
+      _accountDetails.delegateBalance,
       _currentTime
     );
 
+    // TODO: HERE WE NEED TO OVERWRITE OR NAH
     _twabs[_accountDetails.nextTwabIndex] = newTwab;
 
     AccountDetails memory nextAccountDetails = push(_accountDetails);
