@@ -126,7 +126,7 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(oldestIndex, 0);
     assertEq(oldestTwab.amount, 0);
     assertEq(oldestTwab.timestamp, initialTimestamp);
-    assertEq(newestIndex, 2);
+    assertEq(newestIndex, 1);
     assertEq(newestTwab.amount, 30000e18);
     assertEq(newestTwab.timestamp, thirdTimestamp);
   }

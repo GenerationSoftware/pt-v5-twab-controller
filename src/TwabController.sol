@@ -36,6 +36,26 @@ contract TwabController {
 
   /* ============ External Read Functions ============ */
 
+  function balanceOf(address vault, address user) external view returns (uint256) {
+    return userTwabs[vault][user].details.balance;
+  }
+
+  function totalSupply(address vault) external view returns (uint256) {
+    return totalSupplyTwab[vault].details.balance;
+  }
+
+  function totalSupplyDelegateBalance(address vault) external view returns (uint256) {
+    return totalSupplyTwab[vault].details.delegateBalance;
+  }
+
+  function delegateOf(address vault, address _user) external view returns (address) {
+    return delegates[vault][_user];
+  }
+
+  function delegateBalanceOf(address vault, address user) external view returns (uint256) {
+    return userTwabs[vault][user].details.delegateBalance;
+  }
+
   function getAccount(address vault, address _user) external view returns (Account memory) {
     return userTwabs[vault][_user];
   }
@@ -45,10 +65,6 @@ contract TwabController {
     address _user
   ) external view returns (AccountDetails memory) {
     return userTwabs[vault][_user].details;
-  }
-
-  function balanceOf(address vault, address user) external view returns (uint256) {
-    return userTwabs[vault][user].details.balance;
   }
 
   function getDelegateBalanceAt(
@@ -95,7 +111,7 @@ contract TwabController {
       );
   }
 
-  function getAverageDelegateBalanceBetween(
+  function getAverageTotalSupplyDelegateBalanceBetween(
     address vault,
     uint64 _startTime,
     uint64 _endTime
@@ -108,22 +124,6 @@ contract TwabController {
         uint32(_endTime),
         uint32(block.timestamp)
       );
-  }
-
-  function totalSupply(address vault) external view returns (uint256) {
-    return totalSupplyTwab[vault].details.balance;
-  }
-
-  function totalSupplyDelegateBalance(address vault) external view returns (uint256) {
-    return totalSupplyTwab[vault].details.delegateBalance;
-  }
-
-  function delegateOf(address vault, address _user) external view returns (address) {
-    return delegates[vault][_user];
-  }
-
-  function delegateBalanceOf(address vault, address user) external view returns (uint256) {
-    return userTwabs[vault][user].details.delegateBalance;
   }
 
   function getNewestTwab(
@@ -168,8 +168,8 @@ contract TwabController {
     _transferDelegateBalanceRouter(msg.sender, _from, _to, _amount);
   }
 
-  function delegate(address vault, address _to) external {
-    _delegate(vault, msg.sender, _to);
+  function delegate(address vault, address _from, address _to) external {
+    _delegate(vault, _from, _to);
   }
 
   /* ============ Internal Functions ============ */

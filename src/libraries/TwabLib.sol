@@ -399,7 +399,6 @@ library TwabLib {
     uint112 _currentBalance,
     uint32 _time
   ) private pure returns (ObservationLib.Observation memory) {
-    // TODO: HERE WE NEED TO HANDLE WHERE WE"RE OVERWRITING RATHER THAN ADDING A NEW.
     // New twab amount = last twab amount (or zero) + (current amount * elapsed seconds)
     return
       ObservationLib.Observation({
@@ -430,7 +429,17 @@ library TwabLib {
       bool isNew
     )
   {
-    (, ObservationLib.Observation memory _newestTwab) = newestTwab(_twabs, _accountDetails);
+    (uint16 newestTwabIndex, ObservationLib.Observation memory _newestTwab) = newestTwab(
+      _twabs,
+      _accountDetails
+    );
+
+    ObservationLib.Observation memory secondNewestTwab = _twabs[
+      RingBufferLib.prevIndex(
+        RingBufferLib.newestIndex(_accountDetails.nextTwabIndex, MAX_CARDINALITY),
+        MAX_CARDINALITY
+      )
+    ];
 
     // if we're in the same block, return
     if (_newestTwab.timestamp == _currentTime) {
@@ -443,10 +452,22 @@ library TwabLib {
       _currentTime
     );
 
-    // TODO: HERE WE NEED TO OVERWRITE OR NAH
-    _twabs[_accountDetails.nextTwabIndex] = newTwab;
-
-    AccountDetails memory nextAccountDetails = push(_accountDetails);
+    AccountDetails memory nextAccountDetails;
+    if (
+      secondNewestTwab.timestamp == 0 ||
+      OverflowSafeComparatorLib.checkedSub(
+        _newestTwab.timestamp,
+        secondNewestTwab.timestamp,
+        _currentTime
+      ) >=
+      1 days
+    ) {
+      _twabs[_accountDetails.nextTwabIndex] = newTwab;
+      nextAccountDetails = push(_accountDetails);
+    } else {
+      _twabs[RingBufferLib.newestIndex(_accountDetails.nextTwabIndex, MAX_CARDINALITY)] = newTwab;
+      nextAccountDetails = _accountDetails;
+    }
 
     return (nextAccountDetails, newTwab, true);
   }
