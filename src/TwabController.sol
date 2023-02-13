@@ -6,8 +6,30 @@ import { ObservationLib } from "./libraries/ObservationLib.sol";
 import { ExtendedSafeCastLib } from "./libraries/ExtendedSafeCastLib.sol";
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 
+/**
+ * @title  PoolTogether V5 TwabController
+ * @author PoolTogether Inc Team
+ * @dev    Time-Weighted Average Balance Controller for ERC20 tokens.
+ * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical 
+              lookups to a user(s) time-weighted average balance. Each user is mapped to an 
+              Account struct containing the TWAB history (ring buffer) and ring buffer parameters. 
+              Every token.transfer() creates a new TWAB checkpoint. The new TWAB checkpoint is 
+              stored in the circular ring buffer, as either a new checkpoint or rewriting a 
+              previous checkpoint with new parameters. One checkpoint per day is stored. 
+              The TwabLib guarantees minimum 1 year of search history.
+ */
 contract TwabController {
   using ExtendedSafeCastLib for uint256;
+
+  /**
+   * @notice Allows users to revoke their chances to win by delegating to the
+              sponsorship address.
+   * @dev    The user Account.AccountDetails.cardinality parameter can NOT exceed the max 
+              cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new 
+              observation checkpoints. 
+              The MAX_CARDINALITY in fact guarantees at least 1 year of records.
+   */
+  address public constant SPONSORSHIP_ADDRESS = address(1);
 
   /* ============ State ============ */
 
@@ -69,7 +91,7 @@ contract TwabController {
     address vault,
     address _user,
     uint64 _target
-  ) external returns (uint256) {
+  ) external view returns (uint256) {
     Account storage account = userTwabs[vault][_user];
 
     return
@@ -81,7 +103,7 @@ contract TwabController {
       );
   }
 
-  function getTotalSupplyAt(address vault, uint64 _target) external returns (uint256) {
+  function getTotalSupplyAt(address vault, uint64 _target) external view returns (uint256) {
     return
       TwabLib.getDelegateBalanceAt(
         totalSupplyTwab[vault].twabs,
@@ -96,7 +118,7 @@ contract TwabController {
     address _user,
     uint64 _startTime,
     uint64 _endTime
-  ) external returns (uint256) {
+  ) external view returns (uint256) {
     Account storage account = userTwabs[vault][_user];
 
     return
@@ -236,13 +258,12 @@ contract TwabController {
     address _to,
     uint256 _amount
   ) internal {
-    /// @param _amount The balance that is being transferred.
     // If we are transferring tokens from a delegated account to an undelegated account
     if (_from != address(0)) {
       _decreaseUserDelegateBalance(vault, _from, _amount);
 
       // burn
-      if (_to == address(0)) {
+      if (_to == address(0) || _to == SPONSORSHIP_ADDRESS) {
         _decreaseTotalSupplyDelegateBalance(vault, _amount);
       }
     }
@@ -252,7 +273,7 @@ contract TwabController {
       _increaseUserDelegateBalance(vault, _to, _amount);
 
       // mint
-      if (_from == address(0)) {
+      if (_from == address(0) || _from == SPONSORSHIP_ADDRESS) {
         _increaseTotalSupplyDelegateBalance(vault, _amount);
       }
     }
@@ -285,7 +306,10 @@ contract TwabController {
     delegates[vault][_from] = _to;
 
     if (currentDelegate == address(0)) {
-      return;
+      currentDelegate = _from;
+      if (currentDelegate == _to) {
+        return;
+      }
     }
 
     _transferDelegateBalance(vault, currentDelegate, _to, balance);

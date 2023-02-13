@@ -188,6 +188,22 @@ contract TwabControllerTest is BaseSetup {
     assertEq(twabController.getTotalSupplyAt(mockVault, uint64(block.timestamp) + 1 days), 200);
   }
 
+  function testSponsorshipDelegation() external {
+    assertEq(twabController.totalSupply(mockVault), 0);
+    assertEq(twabController.totalSupplyDelegateBalance(mockVault), 0);
+    vm.prank(mockVault);
+    twabController.twabMint(alice, 100);
+    assertEq(twabController.totalSupply(mockVault), 100);
+    assertEq(twabController.totalSupplyDelegateBalance(mockVault), 100);
+    vm.prank(alice);
+    twabController.delegate(mockVault, alice, address(1));
+    assertEq(twabController.totalSupply(mockVault), 100);
+    assertEq(twabController.totalSupplyDelegateBalance(mockVault), 0);
+    // twabController.delegate(mockVault, alice, bob);
+    // assertEq(twabController.totalSupply(mockVault), 100);
+    // assertEq(twabController.totalSupplyDelegateBalance(mockVault), 100);
+  }
+
   function testMint() external {
     deal({ token: address(token), to: alice, give: 100 });
 

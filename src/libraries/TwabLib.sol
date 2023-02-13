@@ -22,9 +22,11 @@ struct AccountDetails {
   uint16 cardinality;
 }
 
-/// @notice Combines account details with their twab history
-/// @param details The account details
-/// @param twabs The history of twabs for this account
+/**
+ * @notice Combines account details with their twab history
+ * @param details The account details
+ * @param twabs The history of twabs for this account
+ */
 struct Account {
   AccountDetails details;
   ObservationLib.Observation[365] twabs;
@@ -55,10 +57,8 @@ library TwabLib {
               cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new 
               observation checkpoints. 
               The MAX_CARDINALITY in fact guarantees at least 1 year of records.
-              The SPONSORSHIP_ADDRESS is the dedicated dead address for delegations.
    */
   uint16 public constant MAX_CARDINALITY = 365; // 1 year
-  address public constant SPONSORSHIP_ADDRESS = address(1);
 
   /**
    * @notice Increases an account's token balance.
