@@ -163,7 +163,7 @@ library TwabLib {
    * @param _currentTime    Block.timestamp
    * @return uint256        Average balance of user held between epoch timestamps start and end
    */
-  function getAverageDelegateBalanceBetween(
+  function getAverageBalanceBetween(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
@@ -171,8 +171,7 @@ library TwabLib {
     uint32 _currentTime
   ) internal view returns (uint256) {
     uint32 endTime = _endTime > _currentTime ? _currentTime : _endTime;
-    return
-      _getAverageDelegateBalanceBetween(_twabs, _accountDetails, _startTime, endTime, _currentTime);
+    return _getAverageBalanceBetween(_twabs, _accountDetails, _startTime, endTime, _currentTime);
   }
 
   /// @notice Retrieves the oldest TWAB
@@ -212,21 +211,21 @@ library TwabLib {
   /// @param _accountDetails  Accounts details
   /// @param _targetTime      Timestamp at which the reserved TWAB should be for.
   /// @return uint256         TWAB amount at `_targetTime`.
-  function getDelegateBalanceAt(
+  function getBalanceAt(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _targetTime,
     uint32 _currentTime
   ) internal view returns (uint256) {
     uint32 timeToTarget = _targetTime > _currentTime ? _currentTime : _targetTime;
-    return _getDelegateBalanceAt(_twabs, _accountDetails, timeToTarget, _currentTime);
+    return _getBalanceAt(_twabs, _accountDetails, timeToTarget, _currentTime);
   }
 
   /// @notice Calculates the average balance held by a user for a given time frame.
   /// @param _startTime   The start time of the time frame.
   /// @param _endTime     The end time of the time frame.
   /// @return uint256     The average balance that the user held during the time frame.
-  function _getAverageDelegateBalanceBetween(
+  function _getAverageBalanceBetween(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
@@ -280,7 +279,7 @@ library TwabLib {
    * @param _currentTime    Block.timestamp
    * @return uint256        Time-weighted average amount between two closest observations.
    */
-  function _getDelegateBalanceAt(
+  function _getBalanceAt(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
     AccountDetails memory _accountDetails,
     uint32 _targetTime,

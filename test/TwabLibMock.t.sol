@@ -49,10 +49,10 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(twab.timestamp, 100);
     assertTrue(isNew);
 
-    uint256 balance = twabLibMock.getDelegateBalanceAt(initialTimestamp, currentTimestamp);
+    uint256 balance = twabLibMock.getBalanceAt(initialTimestamp, currentTimestamp);
     assertEq(balance, 100e18);
 
-    balance = twabLibMock.getDelegateBalanceAt(currentTimestamp, currentTimestamp);
+    balance = twabLibMock.getBalanceAt(currentTimestamp, currentTimestamp);
     assertEq(balance, 100e18);
   }
 
@@ -148,10 +148,10 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(twab.timestamp, 100);
     assertFalse(isNew);
 
-    uint256 balance = twabLibMock.getDelegateBalanceAt(initialTimestamp, currentTimestamp);
+    uint256 balance = twabLibMock.getBalanceAt(initialTimestamp, currentTimestamp);
     assertEq(balance, 0);
 
-    balance = twabLibMock.getDelegateBalanceAt(currentTimestamp, currentTimestamp);
+    balance = twabLibMock.getBalanceAt(currentTimestamp, currentTimestamp);
     assertEq(balance, 0);
   }
 
@@ -231,7 +231,7 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(newestTwab.timestamp, thirdTimestamp);
   }
 
-  // getAverageDelegateBalanceBetween
+  // getAverageBalanceBetween
 
   function averageDelegateBalanceBetweenSingleSetup()
     public
@@ -243,10 +243,10 @@ contract TwabLibMockTest is BaseSetup {
     twabLibMock.increaseDelegateBalance(1000e18, initialTimestamp);
   }
 
-  function testGetAverageDelegateBalanceBetweenSingleBefore() public {
+  function testgetAverageBalanceBetweenSingleBefore() public {
     (uint32 initialTimestamp, uint32 currentTimestamp) = averageDelegateBalanceBetweenSingleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp - 100,
       initialTimestamp - 50,
       currentTimestamp
@@ -254,10 +254,10 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(balance, 0);
   }
 
-  function testGetAverageDelegateBalanceBetweenSingleBeforeIncluding() public {
+  function testgetAverageBalanceBetweenSingleBeforeIncluding() public {
     (uint32 initialTimestamp, uint32 currentTimestamp) = averageDelegateBalanceBetweenSingleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp - 100,
       initialTimestamp,
       currentTimestamp
@@ -265,10 +265,10 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(balance, 0);
   }
 
-  function testGetAverageDelegateBalanceBetweenSingleFuture() public {
+  function testgetAverageBalanceBetweenSingleFuture() public {
     (uint32 initialTimestamp, uint32 currentTimestamp) = averageDelegateBalanceBetweenSingleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp - 50,
       initialTimestamp + 50,
       initialTimestamp
@@ -276,10 +276,10 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(balance, 0);
   }
 
-  function testGetAverageDelegateBalanceBetweenSingleCentered() public {
+  function testgetAverageBalanceBetweenSingleCentered() public {
     (uint32 initialTimestamp, uint32 currentTimestamp) = averageDelegateBalanceBetweenSingleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp - 50,
       initialTimestamp + 50,
       currentTimestamp
@@ -287,10 +287,10 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(balance, 500e18);
   }
 
-  function testGetAverageDelegateBalanceBetweenSingleAfter() public {
+  function testgetAverageBalanceBetweenSingleAfter() public {
     (uint32 initialTimestamp, uint32 currentTimestamp) = averageDelegateBalanceBetweenSingleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp + 50,
       initialTimestamp + 51,
       currentTimestamp
@@ -317,7 +317,7 @@ contract TwabLibMockTest is BaseSetup {
       uint32 currentTimestamp
     ) = averageDelegateBalanceBetweenDoubleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp - 100,
       initialTimestamp - 50,
       currentTimestamp
@@ -332,7 +332,7 @@ contract TwabLibMockTest is BaseSetup {
       uint32 currentTimestamp
     ) = averageDelegateBalanceBetweenDoubleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp - 50,
       initialTimestamp + 50,
       currentTimestamp
@@ -347,7 +347,7 @@ contract TwabLibMockTest is BaseSetup {
       uint32 currentTimestamp
     ) = averageDelegateBalanceBetweenDoubleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp,
       initialTimestamp + 50,
       currentTimestamp
@@ -362,7 +362,7 @@ contract TwabLibMockTest is BaseSetup {
       uint32 currentTimestamp
     ) = averageDelegateBalanceBetweenDoubleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       initialTimestamp + 50,
       secondTimestamp - 50,
       currentTimestamp
@@ -377,7 +377,7 @@ contract TwabLibMockTest is BaseSetup {
       uint32 currentTimestamp
     ) = averageDelegateBalanceBetweenDoubleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       secondTimestamp - 50,
       secondTimestamp + 50,
       currentTimestamp
@@ -392,7 +392,7 @@ contract TwabLibMockTest is BaseSetup {
       uint32 currentTimestamp
     ) = averageDelegateBalanceBetweenDoubleSetup();
 
-    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+    uint256 balance = twabLibMock.getAverageBalanceBetween(
       secondTimestamp + 50,
       secondTimestamp + 51,
       currentTimestamp
@@ -400,12 +400,9 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(balance, 500e18);
   }
 
-  // getDelegateBalanceAt
+  // getBalanceAt
 
-  function getDelegateBalanceAtSetup()
-    public
-    returns (uint32 initialTimestamp, uint32 currentTimestamp)
-  {
+  function getBalanceAtSetup() public returns (uint32 initialTimestamp, uint32 currentTimestamp) {
     initialTimestamp = uint32(1000);
     currentTimestamp = uint32(2000);
 
@@ -413,15 +410,15 @@ contract TwabLibMockTest is BaseSetup {
   }
 
   function testDelegateBalanceAtSingleTwabBefore() public {
-    (uint32 initialTimestamp, uint32 currentTimestamp) = getDelegateBalanceAtSetup();
-    uint256 balance = twabLibMock.getDelegateBalanceAt(500, currentTimestamp);
+    (uint32 initialTimestamp, uint32 currentTimestamp) = getBalanceAtSetup();
+    uint256 balance = twabLibMock.getBalanceAt(500, currentTimestamp);
     assertEq(balance, 0);
   }
 
   function testDelegateBalanceAtSingleTwabAtOrAfter() public {
-    (uint32 initialTimestamp, uint32 currentTimestamp) = getDelegateBalanceAtSetup();
+    (uint32 initialTimestamp, uint32 currentTimestamp) = getBalanceAtSetup();
 
-    uint256 balance = twabLibMock.getDelegateBalanceAt(500, currentTimestamp);
+    uint256 balance = twabLibMock.getBalanceAt(500, currentTimestamp);
     assertEq(balance, 0);
   }
 
@@ -429,7 +426,7 @@ contract TwabLibMockTest is BaseSetup {
     twabLibMock.increaseDelegateBalance(100e18, 1630713395);
     twabLibMock.decreaseDelegateBalance(100e18, "revert-message", 1630713396);
 
-    uint256 balance = twabLibMock.getDelegateBalanceAt(1630713395, 1675702148);
+    uint256 balance = twabLibMock.getBalanceAt(1630713395, 1675702148);
     assertEq(balance, 100e18);
   }
 

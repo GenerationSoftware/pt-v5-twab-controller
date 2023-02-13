@@ -87,7 +87,7 @@ contract TwabController {
     return userTwabs[vault][_user].details;
   }
 
-  function getDelegateBalanceAt(
+  function getBalanceAt(
     address vault,
     address _user,
     uint64 _target
@@ -95,7 +95,7 @@ contract TwabController {
     Account storage account = userTwabs[vault][_user];
 
     return
-      TwabLib.getDelegateBalanceAt(
+      TwabLib.getBalanceAt(
         account.twabs,
         account.details,
         uint32(_target),
@@ -105,7 +105,7 @@ contract TwabController {
 
   function getTotalSupplyAt(address vault, uint64 _target) external view returns (uint256) {
     return
-      TwabLib.getDelegateBalanceAt(
+      TwabLib.getBalanceAt(
         totalSupplyTwab[vault].twabs,
         totalSupplyTwab[vault].details,
         uint32(_target),
@@ -113,7 +113,7 @@ contract TwabController {
       );
   }
 
-  function getAverageDelegateBalanceBetween(
+  function getAverageBalanceBetween(
     address vault,
     address _user,
     uint64 _startTime,
@@ -122,7 +122,7 @@ contract TwabController {
     Account storage account = userTwabs[vault][_user];
 
     return
-      TwabLib.getAverageDelegateBalanceBetween(
+      TwabLib.getAverageBalanceBetween(
         account.twabs,
         account.details,
         uint32(_startTime),
@@ -131,13 +131,13 @@ contract TwabController {
       );
   }
 
-  function getAverageTotalSupplyDelegateBalanceBetween(
+  function getAverageTotalSupplyBetween(
     address vault,
     uint64 _startTime,
     uint64 _endTime
   ) external view returns (uint256) {
     return
-      TwabLib.getAverageDelegateBalanceBetween(
+      TwabLib.getAverageBalanceBetween(
         totalSupplyTwab[vault].twabs,
         totalSupplyTwab[vault].details,
         uint32(_startTime),

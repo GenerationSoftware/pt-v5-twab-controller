@@ -61,13 +61,13 @@ contract TwabLibMock {
     account.details = accountDetails;
   }
 
-  function getAverageDelegateBalanceBetween(
+  function getAverageBalanceBetween(
     uint32 _startTime,
     uint32 _endTime,
     uint32 _currentTime
   ) external returns (uint256) {
     return
-      TwabLib.getAverageDelegateBalanceBetween(
+      TwabLib.getAverageBalanceBetween(
         account.twabs,
         account.details,
         _startTime,
@@ -84,16 +84,11 @@ contract TwabLibMock {
     (index, twab) = TwabLib.newestTwab(account.twabs, account.details);
   }
 
-  function getDelegateBalanceAt(
+  function getBalanceAt(
     uint32 _targetTime,
     uint32 _currentTime
   ) external returns (uint256 balance) {
-    balance = TwabLib.getDelegateBalanceAt(
-      account.twabs,
-      account.details,
-      _targetTime,
-      _currentTime
-    );
+    balance = TwabLib.getBalanceAt(account.twabs, account.details, _targetTime, _currentTime);
   }
 
   function push(

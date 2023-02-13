@@ -58,19 +58,19 @@ contract TwabControllerTest is BaseSetup {
     assertEq(twabController.balanceOf(mockVault, alice), 100);
   }
 
-  function testGetDelegateBalanceAt() external {
-    assertEq(twabController.getDelegateBalanceAt(mockVault, alice, 0), 0);
+  function testgetBalanceAt() external {
+    assertEq(twabController.getBalanceAt(mockVault, alice, 0), 0);
     vm.prank(mockVault);
     twabController.twabMint(alice, 100);
     vm.warp(1 days);
-    assertEq(twabController.getDelegateBalanceAt(mockVault, alice, 1), 100);
+    assertEq(twabController.getBalanceAt(mockVault, alice, 1), 100);
     vm.prank(mockVault);
     twabController.twabMint(alice, 100);
-    assertEq(twabController.getDelegateBalanceAt(mockVault, alice, 1 days), 200);
+    assertEq(twabController.getBalanceAt(mockVault, alice, 1 days), 200);
     vm.prank(mockVault);
     twabController.twabTransfer(alice, bob, 100);
-    assertEq(twabController.getDelegateBalanceAt(mockVault, alice, 1 days), 100);
-    assertEq(twabController.getDelegateBalanceAt(mockVault, bob, 1 days), 100);
+    assertEq(twabController.getBalanceAt(mockVault, alice, 1 days), 100);
+    assertEq(twabController.getBalanceAt(mockVault, bob, 1 days), 100);
   }
 
   function testGetAverageBetween() external {
@@ -82,13 +82,13 @@ contract TwabControllerTest is BaseSetup {
     twabController.twabMint(alice, 1000e18);
     vm.warp(currentTimestamp);
 
-    uint256 balance = twabController.getAverageDelegateBalanceBetween(
+    uint256 balance = twabController.getAverageBalanceBetween(
       mockVault,
       alice,
       initialTimestamp - 100,
       initialTimestamp - 50
     );
-    uint256 totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+    uint256 totalSupply = twabController.getAverageTotalSupplyBetween(
       mockVault,
       initialTimestamp - 100,
       initialTimestamp - 50
@@ -96,13 +96,13 @@ contract TwabControllerTest is BaseSetup {
     assertEq(balance, 0);
     assertEq(totalSupply, 0);
 
-    balance = twabController.getAverageDelegateBalanceBetween(
+    balance = twabController.getAverageBalanceBetween(
       mockVault,
       alice,
       initialTimestamp - 100,
       initialTimestamp
     );
-    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+    totalSupply = twabController.getAverageTotalSupplyBetween(
       mockVault,
       initialTimestamp - 100,
       initialTimestamp
@@ -111,13 +111,13 @@ contract TwabControllerTest is BaseSetup {
     assertEq(totalSupply, 0);
 
     vm.warp(initialTimestamp);
-    balance = twabController.getAverageDelegateBalanceBetween(
+    balance = twabController.getAverageBalanceBetween(
       mockVault,
       alice,
       initialTimestamp - 50,
       initialTimestamp + 50
     );
-    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+    totalSupply = twabController.getAverageTotalSupplyBetween(
       mockVault,
       initialTimestamp - 50,
       initialTimestamp + 50
@@ -126,13 +126,13 @@ contract TwabControllerTest is BaseSetup {
     assertEq(totalSupply, 0);
 
     vm.warp(currentTimestamp);
-    balance = twabController.getAverageDelegateBalanceBetween(
+    balance = twabController.getAverageBalanceBetween(
       mockVault,
       alice,
       initialTimestamp - 50,
       initialTimestamp + 50
     );
-    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+    totalSupply = twabController.getAverageTotalSupplyBetween(
       mockVault,
       initialTimestamp - 50,
       initialTimestamp + 50
@@ -140,13 +140,13 @@ contract TwabControllerTest is BaseSetup {
     assertEq(balance, 500e18);
     assertEq(totalSupply, 500e18);
 
-    balance = twabController.getAverageDelegateBalanceBetween(
+    balance = twabController.getAverageBalanceBetween(
       mockVault,
       alice,
       initialTimestamp + 50,
       initialTimestamp + 51
     );
-    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+    totalSupply = twabController.getAverageTotalSupplyBetween(
       mockVault,
       initialTimestamp + 50,
       initialTimestamp + 51
