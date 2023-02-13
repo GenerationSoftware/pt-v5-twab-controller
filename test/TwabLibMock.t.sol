@@ -18,6 +18,17 @@ contract TwabLibMockTest is BaseSetup {
     twabLibMock = new TwabLibMock();
   }
 
+  function testIncreaseBalanceHappyPath() public {
+    // Increase balance
+    AccountDetails memory accountDetails = twabLibMock.increaseBalance(100e18);
+
+    // Check balance
+    assertEq(accountDetails.balance, 100e18);
+    assertEq(accountDetails.delegateBalance, 0e18);
+    assertEq(accountDetails.nextTwabIndex, 0);
+    assertEq(accountDetails.cardinality, 0);
+  }
+
   function testIncreaseDelegateBalanceHappyPath() public {
     uint32 initialTimestamp = uint32(100);
     uint32 currentTimestamp = uint32(200);
@@ -99,6 +110,95 @@ contract TwabLibMockTest is BaseSetup {
     assertTrue(isNew);
   }
 
+  function testDecreaseBalanceHappyPath() public {
+    // Increase balance
+    AccountDetails memory accountDetails = twabLibMock.increaseBalance(100e18);
+    accountDetails = twabLibMock.decreaseBalance(100e18, "Revert message");
+
+    // Check balance
+    assertEq(accountDetails.balance, 0e18);
+    assertEq(accountDetails.delegateBalance, 0e18);
+    assertEq(accountDetails.nextTwabIndex, 0);
+    assertEq(accountDetails.cardinality, 0);
+  }
+
+  function testDecreaseDelegateBalanceHappyPath() public {
+    uint32 initialTimestamp = uint32(100);
+    uint32 currentTimestamp = uint32(200);
+
+    // Increase balance
+    (
+      AccountDetails memory accountDetails,
+      ObservationLib.Observation memory twab,
+      bool isNew
+    ) = twabLibMock.increaseDelegateBalance(100e18, initialTimestamp);
+    // Decrease balance
+    (accountDetails, twab, isNew) = twabLibMock.decreaseDelegateBalance(
+      100e18,
+      "Revert message",
+      initialTimestamp
+    );
+
+    // Check balance
+    assertEq(accountDetails.balance, 0);
+    assertEq(accountDetails.delegateBalance, 0);
+    assertEq(accountDetails.nextTwabIndex, 1);
+    assertEq(accountDetails.cardinality, 1);
+    assertEq(twab.amount, 0);
+    assertEq(twab.timestamp, 100);
+    assertFalse(isNew);
+
+    uint256 balance = twabLibMock.getDelegateBalanceAt(initialTimestamp, currentTimestamp);
+    assertEq(balance, 0);
+
+    balance = twabLibMock.getDelegateBalanceAt(currentTimestamp, currentTimestamp);
+    assertEq(balance, 0);
+  }
+
+  function testDecreaseDelegateBalanceMultipleRecords() public {
+    uint32 initialTimestamp = uint32(100);
+    uint32 secondTimestamp = uint32(200);
+    uint32 thirdTimestamp = uint32(300);
+
+    // Increase balance
+    (
+      AccountDetails memory accountDetails,
+      ObservationLib.Observation memory twab,
+      bool isNew
+    ) = twabLibMock.increaseDelegateBalance(100e18, initialTimestamp);
+    // Decrease balance
+    (accountDetails, twab, isNew) = twabLibMock.decreaseDelegateBalance(
+      50e18,
+      "Revert message",
+      secondTimestamp
+    );
+
+    // Check balance
+    assertEq(accountDetails.balance, 0);
+    assertEq(accountDetails.delegateBalance, 50e18);
+    assertEq(accountDetails.nextTwabIndex, 2);
+    assertEq(accountDetails.cardinality, 2);
+    assertEq(twab.amount, 10000e18);
+    assertEq(twab.timestamp, 200);
+    assertTrue(isNew);
+
+    // Decrease balance
+    (accountDetails, twab, isNew) = twabLibMock.decreaseDelegateBalance(
+      50e18,
+      "Revert message",
+      thirdTimestamp
+    );
+
+    // Check balance
+    assertEq(accountDetails.balance, 0);
+    assertEq(accountDetails.delegateBalance, 0e18);
+    assertEq(accountDetails.nextTwabIndex, 2);
+    assertEq(accountDetails.cardinality, 2);
+    assertEq(twab.amount, 15000e18);
+    assertEq(twab.timestamp, 300);
+    assertTrue(isNew);
+  }
+
   function testOldestAndNewestTwab() public {
     uint32 initialTimestamp = uint32(100);
     uint32 secondTimestamp = uint32(200);
@@ -137,8 +237,8 @@ contract TwabLibMockTest is BaseSetup {
     public
     returns (uint32 initialTimestamp, uint32 currentTimestamp)
   {
-    initialTimestamp = uint32(1000);
-    currentTimestamp = uint32(2000);
+    initialTimestamp = 1000;
+    currentTimestamp = 2000;
 
     twabLibMock.increaseDelegateBalance(1000e18, initialTimestamp);
   }
@@ -240,6 +340,21 @@ contract TwabLibMockTest is BaseSetup {
     assertEq(balance, 500e18);
   }
 
+  function testAverageDelegateBalanceBetwenDoubleOldestIsFirst() public {
+    (
+      uint32 initialTimestamp,
+      uint32 secondTimestamp,
+      uint32 currentTimestamp
+    ) = averageDelegateBalanceBetweenDoubleSetup();
+
+    uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
+      initialTimestamp,
+      initialTimestamp + 50,
+      currentTimestamp
+    );
+    assertEq(balance, 1000e18);
+  }
+
   function testAverageDelegateBalanceBetweenDoubleBetween() public {
     (
       uint32 initialTimestamp,
@@ -249,7 +364,7 @@ contract TwabLibMockTest is BaseSetup {
 
     uint256 balance = twabLibMock.getAverageDelegateBalanceBetween(
       initialTimestamp + 50,
-      initialTimestamp + 55,
+      secondTimestamp - 50,
       currentTimestamp
     );
     assertEq(balance, 1000e18);

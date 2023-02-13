@@ -77,23 +77,28 @@ contract TwabLibMock {
   }
 
   function oldestTwab() external returns (uint16 index, ObservationLib.Observation memory twab) {
-    return TwabLib.oldestTwab(account.twabs, account.details);
+    (index, twab) = TwabLib.oldestTwab(account.twabs, account.details);
   }
 
   function newestTwab() external returns (uint16 index, ObservationLib.Observation memory twab) {
-    return TwabLib.newestTwab(account.twabs, account.details);
+    (index, twab) = TwabLib.newestTwab(account.twabs, account.details);
   }
 
   function getDelegateBalanceAt(
     uint32 _targetTime,
     uint32 _currentTime
-  ) external returns (uint256) {
-    return TwabLib.getDelegateBalanceAt(account.twabs, account.details, _targetTime, _currentTime);
+  ) external returns (uint256 balance) {
+    balance = TwabLib.getDelegateBalanceAt(
+      account.twabs,
+      account.details,
+      _targetTime,
+      _currentTime
+    );
   }
 
   function push(
     AccountDetails memory _accountDetails
-  ) external pure returns (AccountDetails memory) {
-    return TwabLib.push(_accountDetails);
+  ) external returns (AccountDetails memory _account) {
+    _account = TwabLib.push(_accountDetails);
   }
 }

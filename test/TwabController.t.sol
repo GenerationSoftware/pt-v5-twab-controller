@@ -44,6 +44,13 @@ contract TwabControllerTest is BaseSetup {
     }
   }
 
+  function testGetAccountDetails() external {
+    AccountDetails memory accountDetails = twabController.getAccountDetails(mockVault, alice);
+    assertEq(accountDetails.balance, 0);
+    assertEq(accountDetails.delegateBalance, 0);
+    assertEq(accountDetails.cardinality, 0);
+  }
+
   function testBalanceOf() external {
     assertEq(twabController.balanceOf(mockVault, alice), 0);
     vm.prank(mockVault);
@@ -64,6 +71,88 @@ contract TwabControllerTest is BaseSetup {
     twabController.twabTransfer(alice, bob, 100);
     assertEq(twabController.getDelegateBalanceAt(mockVault, alice, 1 days), 100);
     assertEq(twabController.getDelegateBalanceAt(mockVault, bob, 1 days), 100);
+  }
+
+  function testGetAverageBetween() external {
+    uint32 initialTimestamp = 1000;
+    uint32 currentTimestamp = 2000;
+
+    vm.warp(initialTimestamp);
+    vm.prank(mockVault);
+    twabController.twabMint(alice, 1000e18);
+    vm.warp(currentTimestamp);
+
+    uint256 balance = twabController.getAverageDelegateBalanceBetween(
+      mockVault,
+      alice,
+      initialTimestamp - 100,
+      initialTimestamp - 50
+    );
+    uint256 totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+      mockVault,
+      initialTimestamp - 100,
+      initialTimestamp - 50
+    );
+    assertEq(balance, 0);
+    assertEq(totalSupply, 0);
+
+    balance = twabController.getAverageDelegateBalanceBetween(
+      mockVault,
+      alice,
+      initialTimestamp - 100,
+      initialTimestamp
+    );
+    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+      mockVault,
+      initialTimestamp - 100,
+      initialTimestamp
+    );
+    assertEq(balance, 0);
+    assertEq(totalSupply, 0);
+
+    vm.warp(initialTimestamp);
+    balance = twabController.getAverageDelegateBalanceBetween(
+      mockVault,
+      alice,
+      initialTimestamp - 50,
+      initialTimestamp + 50
+    );
+    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+      mockVault,
+      initialTimestamp - 50,
+      initialTimestamp + 50
+    );
+    assertEq(balance, 0);
+    assertEq(totalSupply, 0);
+
+    vm.warp(currentTimestamp);
+    balance = twabController.getAverageDelegateBalanceBetween(
+      mockVault,
+      alice,
+      initialTimestamp - 50,
+      initialTimestamp + 50
+    );
+    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+      mockVault,
+      initialTimestamp - 50,
+      initialTimestamp + 50
+    );
+    assertEq(balance, 500e18);
+    assertEq(totalSupply, 500e18);
+
+    balance = twabController.getAverageDelegateBalanceBetween(
+      mockVault,
+      alice,
+      initialTimestamp + 50,
+      initialTimestamp + 51
+    );
+    totalSupply = twabController.getAverageTotalSupplyDelegateBalanceBetween(
+      mockVault,
+      initialTimestamp + 50,
+      initialTimestamp + 51
+    );
+    assertEq(balance, 1000e18);
+    assertEq(totalSupply, 1000e18);
   }
 
   function testTotalSupply() external {
@@ -173,6 +262,14 @@ contract TwabControllerTest is BaseSetup {
     assertEq(twabController.balanceOf(mockVault, bob), 0);
     assertEq(twabController.delegateBalanceOf(mockVault, carol), 100);
     assertEq(twabController.balanceOf(mockVault, carol), 0);
+  }
+
+  function testDelegateToDelegate() external {
+    assertEq(twabController.delegateOf(mockVault, alice), address(0));
+    twabController.delegate(mockVault, alice, alice);
+    assertEq(twabController.delegateOf(mockVault, alice), alice);
+    twabController.delegate(mockVault, alice, alice);
+    assertEq(twabController.delegateOf(mockVault, alice), alice);
   }
 
   // ---
@@ -294,5 +391,36 @@ contract TwabControllerTest is BaseSetup {
     assertEq(twab.amount, 30240000e18);
     assertEq(twab.timestamp, t4);
     assertEq(index, 3);
+  }
+
+  function testGetOldestAndNewestTwab() external {
+    (uint16 newestIndex, ObservationLib.Observation memory newestTwab) = twabController
+      .getNewestTwab(mockVault, alice);
+    assertEq(newestTwab.amount, 0);
+    assertEq(newestTwab.timestamp, 0);
+    assertEq(newestIndex, 364);
+
+    (uint16 oldestIndex, ObservationLib.Observation memory oldestTwab) = twabController
+      .getOldestTwab(mockVault, alice);
+    assertEq(oldestTwab.amount, 0);
+    assertEq(oldestTwab.timestamp, 0);
+    assertEq(oldestIndex, 0);
+
+    // Wrap around the TWAB storage
+    for (uint32 i = 0; i <= 365; i++) {
+      vm.warp((i + 1) * 1 days);
+      vm.prank(mockVault);
+      twabController.twabMint(alice, 100e18);
+    }
+
+    (newestIndex, newestTwab) = twabController.getNewestTwab(mockVault, alice);
+    assertEq(newestTwab.amount, 577108800000e18);
+    assertEq(newestTwab.timestamp, 366 days);
+    assertEq(newestIndex, 0);
+
+    (oldestIndex, oldestTwab) = twabController.getOldestTwab(mockVault, alice);
+    assertEq(oldestTwab.amount, 8640000e18);
+    assertEq(oldestTwab.timestamp, 2 days);
+    assertEq(oldestIndex, 1);
   }
 }

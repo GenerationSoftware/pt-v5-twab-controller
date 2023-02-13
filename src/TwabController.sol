@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import "forge-std/console.sol";
-
 import { TwabLib, Account, AccountDetails } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";
 import { ExtendedSafeCastLib } from "./libraries/ExtendedSafeCastLib.sol";
@@ -98,7 +96,7 @@ contract TwabController {
     address _user,
     uint64 _startTime,
     uint64 _endTime
-  ) external view returns (uint256) {
+  ) external returns (uint256) {
     Account storage account = userTwabs[vault][_user];
 
     return
