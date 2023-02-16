@@ -12,17 +12,17 @@ contract TwabLibMock {
 
   function increaseBalance(
     uint112 _amount
-  ) external returns (AccountDetails memory accountDetails) {
-    accountDetails = TwabLib.increaseBalance(account, _amount);
-    account.details = accountDetails;
+  ) external returns (AccountDetails memory) {
+    TwabLib.increaseBalance(account, _amount);
+    return account.details;
   }
 
   function decreaseBalance(
     uint112 _amount,
     string memory _revertMessage
-  ) external returns (AccountDetails memory accountDetails) {
-    accountDetails = TwabLib.decreaseBalance(account, _amount, _revertMessage);
-    account.details = accountDetails;
+  ) external returns (AccountDetails memory) {
+    TwabLib.decreaseBalance(account, _amount, _revertMessage);
+    return account.details;
   }
 
   function increaseDelegateBalance(

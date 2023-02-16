@@ -37,10 +37,10 @@ struct Account {
  * @author PoolTogether Inc Team
  * @dev    Time-Weighted Average Balance Library for ERC20 tokens.
  * @notice This TwabLib adds on-chain historical lookups to a user(s) time-weighted average balance.
-              Each user is mapped to an Account struct containing the TWAB history (ring buffer) and 
-              ring buffer parameters. Every token.transfer() creates a new TWAB checkpoint. The new 
-              TWAB checkpoint is stored in the circular ring buffer, as either a new checkpoint or 
-              rewriting a previous checkpoint with new parameters. One checkpoint per day is stored. 
+              Each user is mapped to an Account struct containing the TWAB history (ring buffer) and
+              ring buffer parameters. Every token.transfer() creates a new TWAB checkpoint. The new
+              TWAB checkpoint is stored in the circular ring buffer, as either a new checkpoint or
+              rewriting a previous checkpoint with new parameters. One checkpoint per day is stored.
               The TwabLib guarantees minimum 1 year of search history.
  */
 library TwabLib {
@@ -48,14 +48,14 @@ library TwabLib {
   using ExtendedSafeCastLib for uint256;
 
   /**
-   * @notice Sets max ring buffer length in the Account.twabs Observation list. 
-              As users transfer/mint/burn tickets new Observation checkpoints are recorded. 
-              The current max cardinality guarantees a seven year minimum, of accurate historical 
-              lookups with current estimates of 1 new block every 15 seconds - assuming each block 
+   * @notice Sets max ring buffer length in the Account.twabs Observation list.
+              As users transfer/mint/burn tickets new Observation checkpoints are recorded.
+              The current max cardinality guarantees a seven year minimum, of accurate historical
+              lookups with current estimates of 1 new block every 15 seconds - assuming each block
               contains a transfer to trigger an observation write to storage.
-   * @dev    The user Account.AccountDetails.cardinality parameter can NOT exceed the max 
-              cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new 
-              observation checkpoints. 
+   * @dev    The user Account.AccountDetails.cardinality parameter can NOT exceed the max
+              cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new
+              observation checkpoints.
               The MAX_CARDINALITY in fact guarantees at least 1 year of records.
    */
   uint16 public constant MAX_CARDINALITY = 365; // 1 year
@@ -64,15 +64,12 @@ library TwabLib {
    * @notice Increases an account's token balance.
    * @param _account          The account whose balance will be increased
    * @param _amount           The amount to increase the balance by
-   * @return accountDetails   The new AccountDetails
    */
   function increaseBalance(
     Account storage _account,
     uint112 _amount
-  ) internal view returns (AccountDetails memory accountDetails) {
-    AccountDetails memory _accountDetails = _account.details;
-    _accountDetails.balance = _accountDetails.balance + _amount;
-    accountDetails = _accountDetails;
+  ) internal {
+    _account.details.balance += _amount;
   }
 
   /**
@@ -80,19 +77,17 @@ library TwabLib {
    * @param _account          The account whose balance will be decreased
    * @param _amount           The amount to decrease the balance by
    * @param _revertMessage    The revert message for insufficient balance
-   * @return accountDetails   The new AccountDetails
    */
   function decreaseBalance(
     Account storage _account,
     uint112 _amount,
     string memory _revertMessage
-  ) internal view returns (AccountDetails memory accountDetails) {
-    AccountDetails memory _accountDetails = _account.details;
-    require(_accountDetails.balance >= _amount, _revertMessage);
+  ) internal {
+    require(_account.details.balance >= _amount, _revertMessage);
+
     unchecked {
-      _accountDetails.balance -= _amount;
+      _account.details.balance -= _amount;
     }
-    accountDetails = _accountDetails;
   }
 
   /**

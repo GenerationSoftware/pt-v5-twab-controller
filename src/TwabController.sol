@@ -10,12 +10,12 @@ import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
  * @title  PoolTogether V5 TwabController
  * @author PoolTogether Inc Team
  * @dev    Time-Weighted Average Balance Controller for ERC20 tokens.
- * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical 
-              lookups to a user(s) time-weighted average balance. Each user is mapped to an 
-              Account struct containing the TWAB history (ring buffer) and ring buffer parameters. 
-              Every token.transfer() creates a new TWAB checkpoint. The new TWAB checkpoint is 
-              stored in the circular ring buffer, as either a new checkpoint or rewriting a 
-              previous checkpoint with new parameters. One checkpoint per day is stored. 
+ * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical
+              lookups to a user(s) time-weighted average balance. Each user is mapped to an
+              Account struct containing the TWAB history (ring buffer) and ring buffer parameters.
+              Every token.transfer() creates a new TWAB checkpoint. The new TWAB checkpoint is
+              stored in the circular ring buffer, as either a new checkpoint or rewriting a
+              previous checkpoint with new parameters. One checkpoint per day is stored.
               The TwabLib guarantees minimum 1 year of search history.
  */
 contract TwabController {
@@ -24,9 +24,9 @@ contract TwabController {
   /**
    * @notice Allows users to revoke their chances to win by delegating to the
               sponsorship address.
-   * @dev    The user Account.AccountDetails.cardinality parameter can NOT exceed the max 
-              cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new 
-              observation checkpoints. 
+   * @dev    The user Account.AccountDetails.cardinality parameter can NOT exceed the max
+              cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new
+              observation checkpoints.
               The MAX_CARDINALITY in fact guarantees at least 1 year of records.
    */
   address public constant SPONSORSHIP_ADDRESS = address(1);
@@ -411,9 +411,8 @@ contract TwabController {
     if (_amount == 0) {
       return;
     }
-    Account storage _account = userTwabs[vault][_to];
-    AccountDetails memory accountDetails = TwabLib.increaseBalance(_account, uint112(_amount));
-    _account.details = accountDetails;
+
+    TwabLib.increaseBalance(userTwabs[vault][_to], uint112(_amount));
   }
 
   function _decreaseUserBalance(address vault, address _to, uint256 _amount) internal {
@@ -421,15 +420,11 @@ contract TwabController {
       return;
     }
 
-    Account storage _account = userTwabs[vault][_to];
-
-    AccountDetails memory accountDetails = TwabLib.decreaseBalance(
-      _account,
+    TwabLib.decreaseBalance(
+      userTwabs[vault][_to],
       uint112(_amount),
       "TwabController/twab-burn-lt-balance"
     );
-
-    _account.details = accountDetails;
   }
 
   function _increaseTotalSupplyBalance(address vault, uint256 _amount) internal {
@@ -437,11 +432,7 @@ contract TwabController {
       return;
     }
 
-    AccountDetails memory accountDetails = TwabLib.increaseBalance(
-      totalSupplyTwab[vault],
-      uint112(_amount)
-    );
-    totalSupplyTwab[vault].details = accountDetails;
+    TwabLib.increaseBalance(totalSupplyTwab[vault], uint112(_amount));
   }
 
   function _decreaseTotalSupplyBalance(address vault, uint256 _amount) internal {
@@ -449,11 +440,10 @@ contract TwabController {
       return;
     }
 
-    AccountDetails memory accountDetails = TwabLib.decreaseBalance(
+    TwabLib.decreaseBalance(
       totalSupplyTwab[vault],
       uint112(_amount),
       "TwabController/burn-amount-exceeds-total-supply-balance"
     );
-    totalSupplyTwab[vault].details = accountDetails;
   }
 }
