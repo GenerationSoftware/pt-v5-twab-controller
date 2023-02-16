@@ -61,59 +61,32 @@ library TwabLib {
   uint16 public constant MAX_CARDINALITY = 365; // 1 year
 
   /**
-   * @notice Increases an account's token balance.
-   * @param _account          The account whose balance will be increased
-   * @param _amount           The amount to increase the balance by
-   */
-  function increaseBalance(
-    Account storage _account,
-    uint112 _amount
-  ) internal {
-    _account.details.balance += _amount;
-  }
-
-  /**
-   * @notice Decreases an account's token balance.
-   * @param _account          The account whose balance will be decreased
-   * @param _amount           The amount to decrease the balance by
-   * @param _revertMessage    The revert message for insufficient balance
-   */
-  function decreaseBalance(
-    Account storage _account,
-    uint112 _amount,
-    string memory _revertMessage
-  ) internal {
-    require(_account.details.balance >= _amount, _revertMessage);
-
-    unchecked {
-      _account.details.balance -= _amount;
-    }
-  }
-
-  /**
    * @notice Increases an account's delegate balance and records a new twab.
    * @param _account          The account whose delegateBalance will be increased
    * @param _amount           The amount to increase the delegateBalance by
    * @param _currentTime      The current time
-   * @return accountDetails   The new AccountDetails
    * @return twab             The user's latest TWAB
    * @return isNew            Whether the TWAB is new
    */
-  function increaseDelegateBalance(
+  function increaseBalances(
     Account storage _account,
     uint112 _amount,
+    uint112 _delegateAmount,
     uint32 _currentTime
   )
     internal
     returns (
-      AccountDetails memory accountDetails,
       ObservationLib.Observation memory twab,
       bool isNew
     )
   {
-    accountDetails = _account.details;
-    (accountDetails, twab, isNew) = _nextTwab(_account.twabs, accountDetails, _currentTime);
-    accountDetails.delegateBalance = accountDetails.delegateBalance + _amount;
+
+    if (_delegateAmount != uint112(0)) {
+      (, twab, isNew) = _nextTwab(_account.twabs, _account.details, _currentTime);
+    }
+
+    _account.details.balance += _amount;
+    _account.details.delegateBalance += _delegateAmount;
   }
 
   /**
@@ -122,28 +95,33 @@ library TwabLib {
    * @param _account        Account whose delegateBalance will be decreased
    * @param _amount         Amount to decrease the delegateBalance by
    * @param _revertMessage  Revert message for insufficient delegateBalance
-   * @return accountDetails Updated Account.details struct
    * @return twab           TWAB observation (with decreasing average)
    * @return isNew          Whether TWAB is new or calling twice in the same block
    */
-  function decreaseDelegateBalance(
+  function decreaseBalances(
     Account storage _account,
     uint112 _amount,
+    uint112 _delegateAmount,
     string memory _revertMessage,
     uint32 _currentTime
   )
     internal
     returns (
-      AccountDetails memory accountDetails,
       ObservationLib.Observation memory twab,
       bool isNew
     )
   {
-    accountDetails = _account.details;
-    require(accountDetails.delegateBalance >= _amount, _revertMessage);
-    (accountDetails, twab, isNew) = _nextTwab(_account.twabs, accountDetails, _currentTime);
+    AccountDetails memory _accountDetails = _account.details;
+    require(_account.details.balance >= _amount, _revertMessage);
+    require(_accountDetails.delegateBalance >= _delegateAmount, _revertMessage);
+
+    if (_delegateAmount != uint112(0)) {
+      (, twab, isNew) = _nextTwab(_account.twabs, _accountDetails, _currentTime);
+    }
+
     unchecked {
-      accountDetails.delegateBalance -= _amount;
+      _account.details.balance -= _amount;
+      _account.details.delegateBalance -= _delegateAmount;
     }
   }
 

@@ -36,8 +36,8 @@ contract TwabLibMock {
       bool isNew
     )
   {
-    (accountDetails, twab, isNew) = TwabLib.increaseDelegateBalance(account, _amount, _currentTime);
-    account.details = accountDetails;
+    (twab, isNew) = TwabLib.increaseDelegateBalance(account, _amount, _currentTime);
+    accountDetails = account.details;
   }
 
   function decreaseDelegateBalance(
@@ -52,13 +52,14 @@ contract TwabLibMock {
       bool isNew
     )
   {
-    (accountDetails, twab, isNew) = TwabLib.decreaseDelegateBalance(
+    (twab, isNew) = TwabLib.decreaseDelegateBalance(
       account,
       _amount,
       _revertMessage,
       _currentTime
     );
-    account.details = accountDetails;
+
+    accountDetails = account.details;
   }
 
   function getAverageBalanceBetween(

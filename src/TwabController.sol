@@ -68,8 +68,8 @@ contract TwabController {
     return totalSupplyTwab[vault].details.delegateBalance;
   }
 
-  function delegateOf(address vault, address _user) external view returns (address) {
-    return delegates[vault][_user];
+  function delegateOf(address _vault, address _user) external view returns (address) {
+    return _delegateOf(_vault, _user);
   }
 
   function delegateBalanceOf(address vault, address user) external view returns (uint256) {
@@ -167,8 +167,7 @@ contract TwabController {
   function twabMint(address _to, uint256 _amount) external {
     // TODO: Should handle updating balance and delegateBalance inside Twablib
     // NOTE: Balance first so it's picked up in the delegateBalance update
-    _mintBalance(msg.sender, _to, _amount);
-    _mintDelegateBalance(msg.sender, _to, _amount);
+    _transferBalance(msg.sender, address(0), _to, _amount);
   }
 
   // Updates the users (or delegates) delegateBalance
@@ -176,8 +175,7 @@ contract TwabController {
   function twabBurn(address _from, uint256 _amount) external {
     // TODO: Should handle updating balance and delegateBalance inside Twablib
     // NOTE: Balance first so it's picked up in the delegateBalance update
-    _burnBalance(msg.sender, _from, _amount);
-    _burnDelegateBalance(msg.sender, _from, _amount);
+    _transferBalance(msg.sender, _from, address(0), _amount);
   }
 
   // Updates the users (or delegates) delegateBalance
@@ -185,7 +183,6 @@ contract TwabController {
   function twabTransfer(address _from, address _to, uint256 _amount) external {
     // NOTE: Balance first so it's picked up in the delegateBalance update
     _transferBalance(msg.sender, _from, _to, _amount);
-    _transferDelegateBalanceRouter(msg.sender, _from, _to, _amount);
   }
 
   function delegate(address vault, address _from, address _to) external {
@@ -194,7 +191,7 @@ contract TwabController {
 
   /* ============ Internal Functions ============ */
 
-  function _transferBalance(address vault, address _from, address _to, uint256 _amount) internal {
+  function _transferBalance(address _vault, address _from, address _to, uint256 _amount) internal {
     if (_from == _to) {
       return;
     }
@@ -202,248 +199,233 @@ contract TwabController {
     /// @param _amount The balance that is being transferred.
     // If we are transferring tokens from a delegated account to an undelegated account
     if (_from != address(0)) {
-      _decreaseUserBalance(vault, _from, _amount);
+      address _fromDelegate = _delegateOf(_vault, _from);
+
+      if (_fromDelegate != SPONSORSHIP_ADDRESS) {
+        _decreaseBalances(
+          _vault,
+          _fromDelegate,
+          0,
+          _amount
+        );
+      }
+
+      _decreaseBalances(
+        _vault,
+        _from,
+        _amount,
+        _fromDelegate == _from ? _amount : 0
+      );
+
+      /**
+        * fromDelegate = delegateOf(_vault, _from);
+        * If fromDelegate == from we want to decreaseBalances
+        * => decreaseBalances(from, 100, 100);
+        * Else if fromDelegate != SPONSORSHIP_ADDRESS
+        * we need to decrease to delegateBalance and from balance
+        * decreaseBalances(from, 100, 0);
+        * decreaseBalances(fromDelegate, 0, 100);
+        * Else
+        * decreaseBalances(from, 100, 0);
+       */
+
 
       // burn
       if (_to == address(0)) {
-        _decreaseTotalSupplyBalance(vault, _amount);
+        _decreaseTotalSupplyBalances(
+          _vault,
+          _amount,
+          _fromDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+        );
       }
     }
 
     // If we are transferring tokens from an undelegated account to a delegated account
     if (_to != address(0)) {
-      _increaseUserBalance(vault, _to, _amount);
+      address _toDelegate = _delegateOf(_vault, _to);
+
+      if (_toDelegate != SPONSORSHIP_ADDRESS) {
+        _increaseBalances(
+          _vault,
+          _toDelegate,
+          0,
+          _amount
+        );
+      }
+
+      _increaseBalances(
+        _vault,
+        _from,
+        _amount,
+        _toDelegate == _to ? _amount : 0
+      );
 
       // mint
       if (_from == address(0)) {
-        _increaseTotalSupplyBalance(vault, _amount);
+        _increaseTotalSupplyBalances(
+          _vault,
+          _amount,
+          _toDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+        );
       }
     }
   }
 
-  function _transferDelegateBalanceRouter(
-    address vault,
-    address _from,
-    address _to,
-    uint256 _amount
-  ) internal {
-    if (_from == _to) {
-      return;
-    }
+  function _delegateOf(address _vault, address _user) internal view returns(address) {
+    address _userDelegate;
 
-    address _fromDelegate;
-    if (_from != address(0)) {
-      _fromDelegate = delegates[vault][_from];
+    if (_user != address(0)) {
+      _userDelegate = delegates[_vault][_user];
+
       // If the user has not delegated, then the user is the delegate
-      if (_fromDelegate == address(0)) {
-        _fromDelegate = _from;
+      if (_userDelegate == address(0)) {
+        _userDelegate = _user;
       }
     }
 
-    address _toDelegate;
-    if (_to != address(0)) {
-      _toDelegate = delegates[vault][_to];
-      // If the user has not delegated, then the user is the delegate
-      if (_toDelegate == address(0)) {
-        _toDelegate = _to;
-      }
-    }
-
-    _transferDelegateBalance(vault, _fromDelegate, _toDelegate, _amount);
+    return _userDelegate;
   }
 
   function _transferDelegateBalance(
-    address vault,
-    address _from,
-    address _to,
-    uint256 _amount
+    address _vault,
+    address _fromDelegate,
+    address _toDelegate,
+    uint256 _delegateAmount
   ) internal {
     // If we are transferring tokens from a delegated account to an undelegated account
-    if (_from != address(0)) {
-      _decreaseUserDelegateBalance(vault, _from, _amount);
+    if (_fromDelegate != address(0)) {
+      _decreaseBalances(_vault, _fromDelegate, 0, _delegateAmount);
 
       // burn
-      if (_to == address(0) || _to == SPONSORSHIP_ADDRESS) {
-        _decreaseTotalSupplyDelegateBalance(vault, _amount);
+      if (_toDelegate == address(0) || _toDelegate == SPONSORSHIP_ADDRESS) {
+        _decreaseTotalSupplyBalances(_vault, 0, _delegateAmount);
       }
     }
 
     // If we are transferring tokens from an undelegated account to a delegated account
-    if (_to != address(0)) {
-      _increaseUserDelegateBalance(vault, _to, _amount);
+    if (_toDelegate != address(0)) {
+      _increaseBalances(
+        _vault,
+        _toDelegate,
+        0,
+        _delegateAmount
+      );
 
       // mint
-      if (_from == address(0) || _from == SPONSORSHIP_ADDRESS) {
-        _increaseTotalSupplyDelegateBalance(vault, _amount);
+      if (_fromDelegate == address(0) || _fromDelegate == SPONSORSHIP_ADDRESS) {
+        _increaseTotalSupplyBalances(_vault, 0, _delegateAmount);
       }
     }
   }
 
-  function _mintBalance(address vault, address _to, uint256 _amount) internal {
-    _transferBalance(vault, address(0), _to, _amount);
-  }
+  function _delegate(address _vault, address _from, address _toDelegate) internal {
+    address _currentDelegate = _delegateOf(_vault, _from);
 
-  function _mintDelegateBalance(address vault, address _to, uint256 _amount) internal {
-    _transferDelegateBalanceRouter(vault, address(0), _to, _amount);
-  }
-
-  function _burnBalance(address vault, address _from, uint256 _amount) internal {
-    _transferBalance(vault, _from, address(0), _amount);
-  }
-
-  function _burnDelegateBalance(address vault, address _from, uint256 _amount) internal {
-    _transferDelegateBalanceRouter(vault, _from, address(0), _amount);
-  }
-
-  function _delegate(address vault, address _from, address _to) internal {
-    uint256 balance = userTwabs[vault][_from].details.balance;
-    address currentDelegate = delegates[vault][_from];
-
-    if (currentDelegate == _to) {
+    if (_currentDelegate == _toDelegate) {
       return;
     }
 
-    delegates[vault][_from] = _to;
+    delegates[_vault][_from] = _toDelegate;
 
-    if (currentDelegate == address(0)) {
-      currentDelegate = _from;
-      if (currentDelegate == _to) {
-        return;
-      }
-    }
+    _transferDelegateBalance(
+      _vault,
+      _currentDelegate,
+      _toDelegate,
+      userTwabs[_vault][_from].details.balance
+    );
 
-    _transferDelegateBalance(vault, currentDelegate, _to, balance);
-
-    emit Delegated(vault, _from, _to);
+    emit Delegated(_vault, _from, _toDelegate);
   }
 
-  function _increaseUserDelegateBalance(address vault, address _to, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
-
-    Account storage _account = userTwabs[vault][_to];
-
+  function _increaseBalances(
+    address _vault,
+    address _account,
+    uint256 _amount,
+    uint256 _delegateAmount
+  ) internal {
     (
-      AccountDetails memory accountDetails,
-      ObservationLib.Observation memory twab,
-      bool isNew
-    ) = TwabLib.increaseDelegateBalance(_account, uint112(_amount), uint32(block.timestamp));
-
-    _account.details = accountDetails;
-
-    if (isNew) {
-      emit NewUserTwab(vault, _to, twab);
-    }
-  }
-
-  function _decreaseUserDelegateBalance(address vault, address _to, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
-
-    Account storage _account = userTwabs[vault][_to];
-
-    (
-      AccountDetails memory accountDetails,
-      ObservationLib.Observation memory twab,
-      bool isNew
-    ) = TwabLib.decreaseDelegateBalance(
-        _account,
+      ObservationLib.Observation memory _twab,
+      bool _isNew
+    ) = TwabLib.increaseBalances(
+        userTwabs[_vault][_account],
         uint112(_amount),
+        uint112(_delegateAmount),
+        uint32(block.timestamp)
+      );
+
+    if (_isNew) {
+      emit NewUserTwab(_vault, _account, _twab);
+    }
+  }
+
+  function _decreaseBalances(
+    address _vault,
+    address _account,
+    uint256 _amount,
+    uint256 _delegateAmount
+  ) internal {
+    (
+      ObservationLib.Observation memory _twab,
+      bool _isNew
+    ) = TwabLib.decreaseBalances(
+        userTwabs[_vault][_account],
+        uint112(_amount),
+        uint112(_delegateAmount),
         "TwabController/twab-burn-lt-delegate-balance",
         uint32(block.timestamp)
       );
 
-    _account.details = accountDetails;
-
-    if (isNew) {
-      emit NewUserTwab(vault, _to, twab);
+    if (_isNew) {
+      emit NewUserTwab(_vault, _account, _twab);
     }
   }
 
-  function _increaseTotalSupplyDelegateBalance(address vault, uint256 _amount) internal {
+  function _decreaseTotalSupplyBalances(
+    address _vault,
+    uint256 _amount,
+    uint256 _delegateAmount
+  ) internal {
     if (_amount == 0) {
       return;
     }
 
     (
-      AccountDetails memory accountDetails,
       ObservationLib.Observation memory _totalSupply,
-      bool tsIsNew
-    ) = TwabLib.increaseDelegateBalance(
-        totalSupplyTwab[vault],
-        uint112(_amount),
-        uint32(block.timestamp)
-      );
+      bool _tsIsNew
+    ) = TwabLib.decreaseBalances(
+      totalSupplyTwab[_vault],
+      uint112(_amount),
+      uint112(_delegateAmount),
+      "TwabController/burn-amount-exceeds-total-supply-balance",
+      uint32(block.timestamp)
+    );
 
-    totalSupplyTwab[vault].details = accountDetails;
-
-    if (tsIsNew) {
-      emit NewTotalSupplyTwab(vault, _totalSupply);
+    if (_tsIsNew) {
+      emit NewTotalSupplyTwab(_vault, _totalSupply);
     }
   }
 
-  function _decreaseTotalSupplyDelegateBalance(address vault, uint256 _amount) internal {
+  function _increaseTotalSupplyBalances(
+    address _vault,
+    uint256 _amount,
+    uint256 _delegateAmount
+  ) internal {
     if (_amount == 0) {
       return;
     }
 
     (
-      AccountDetails memory accountDetails,
-      ObservationLib.Observation memory tsTwab,
-      bool tsIsNew
-    ) = TwabLib.decreaseDelegateBalance(
-        totalSupplyTwab[vault],
-        uint112(_amount),
-        "TwabController/burn-amount-exceeds-total-supply-twab",
-        uint32(block.timestamp)
-      );
-
-    totalSupplyTwab[vault].details = accountDetails;
-
-    if (tsIsNew) {
-      emit NewTotalSupplyTwab(vault, tsTwab);
-    }
-  }
-
-  function _increaseUserBalance(address vault, address _to, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
-
-    TwabLib.increaseBalance(userTwabs[vault][_to], uint112(_amount));
-  }
-
-  function _decreaseUserBalance(address vault, address _to, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
-
-    TwabLib.decreaseBalance(
-      userTwabs[vault][_to],
+      ObservationLib.Observation memory _totalSupply,
+      bool _tsIsNew
+    ) = TwabLib.increaseBalances(
+      totalSupplyTwab[_vault],
       uint112(_amount),
-      "TwabController/twab-burn-lt-balance"
+      uint112(_delegateAmount),
+      uint32(block.timestamp)
     );
-  }
 
-  function _increaseTotalSupplyBalance(address vault, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
+    if (_tsIsNew) {
+      emit NewTotalSupplyTwab(_vault, _totalSupply);
     }
-
-    TwabLib.increaseBalance(totalSupplyTwab[vault], uint112(_amount));
-  }
-
-  function _decreaseTotalSupplyBalance(address vault, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
-
-    TwabLib.decreaseBalance(
-      totalSupplyTwab[vault],
-      uint112(_amount),
-      "TwabController/burn-amount-exceeds-total-supply-balance"
-    );
   }
 }
