@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 
 import { TwabController } from "../src/TwabController.sol";
-import { TwabLib, Account, AccountDetails } from "../src/libraries/TwabLib.sol";
+import { TwabLib, Account } from "../src/libraries/TwabLib.sol";
 import { ObservationLib } from "../src/libraries/ObservationLib.sol";
 import { BaseSetup } from "./utils/BaseSetup.sol";
 import { TwabLibMock } from "./mocks/TwabLibMock.sol";
@@ -35,20 +35,13 @@ contract TwabControllerTest is BaseSetup {
 
   function testGetAccount() external {
     Account memory account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 0);
-    assertEq(account.details.delegateBalance, 0);
-    assertEq(account.details.cardinality, 0);
+    assertEq(account.balance, 0);
+    assertEq(account.delegateBalance, 0);
+    assertEq(account.cardinality, 0);
     for (uint256 i = 0; i < MAX_CARDINALITY; i++) {
       assertEq(account.twabs[i].amount, 0);
       assertEq(account.twabs[i].timestamp, 0);
     }
-  }
-
-  function testGetAccountDetails() external {
-    AccountDetails memory accountDetails = twabController.getAccountDetails(mockVault, alice);
-    assertEq(accountDetails.balance, 0);
-    assertEq(accountDetails.delegateBalance, 0);
-    assertEq(accountDetails.cardinality, 0);
   }
 
   function testBalanceOf() external {
@@ -222,8 +215,8 @@ contract TwabControllerTest is BaseSetup {
     twabController.twabMint(alice, 100);
 
     Account memory account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 100);
-    assertEq(account.details.delegateBalance, 100);
+    assertEq(account.balance, 100);
+    assertEq(account.delegateBalance, 100);
   }
 
   function testBurn() external {
@@ -234,8 +227,8 @@ contract TwabControllerTest is BaseSetup {
     vm.prank(mockVault);
     twabController.twabBurn(alice, 100);
     Account memory account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 0);
-    assertEq(account.details.delegateBalance, 0);
+    assertEq(account.balance, 0);
+    assertEq(account.delegateBalance, 0);
   }
 
   function testDelegate() external {
@@ -309,8 +302,8 @@ contract TwabControllerTest is BaseSetup {
     twabController.twabBurn(alice, 100e18);
 
     Account memory account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 100e18);
-    assertEq(account.details.delegateBalance, 100e18);
+    assertEq(account.balance, 100e18);
+    assertEq(account.delegateBalance, 100e18);
 
     (uint16 index, ObservationLib.Observation memory twab) = twabController.getNewestTwab(
       mockVault,
@@ -324,8 +317,8 @@ contract TwabControllerTest is BaseSetup {
     vm.prank(mockVault);
     twabController.twabMint(alice, 100e18);
     account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 200e18);
-    assertEq(account.details.delegateBalance, 200e18);
+    assertEq(account.balance, 200e18);
+    assertEq(account.delegateBalance, 200e18);
 
     (index, twab) = twabController.getNewestTwab(mockVault, alice);
     assertEq(twab.amount, 30240000e18);
@@ -352,46 +345,46 @@ contract TwabControllerTest is BaseSetup {
     vm.prank(mockVault);
     twabController.twabMint(alice, 100e18);
     account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 100e18);
-    assertEq(account.details.delegateBalance, 100e18);
-    assertEq(account.details.nextTwabIndex, 1);
-    assertEq(account.details.cardinality, 1);
+    assertEq(account.balance, 100e18);
+    assertEq(account.delegateBalance, 100e18);
+    assertEq(account.nextTwabIndex, 1);
+    assertEq(account.cardinality, 1);
 
     vm.warp(t1);
     vm.prank(mockVault);
     twabController.twabMint(alice, 100e18);
     account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 200e18);
-    assertEq(account.details.delegateBalance, 200e18);
-    assertEq(account.details.nextTwabIndex, 2);
-    assertEq(account.details.cardinality, 2);
+    assertEq(account.balance, 200e18);
+    assertEq(account.delegateBalance, 200e18);
+    assertEq(account.nextTwabIndex, 2);
+    assertEq(account.cardinality, 2);
 
     vm.warp(t2);
     vm.prank(mockVault);
     twabController.twabBurn(alice, 100e18);
     account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 100e18);
-    assertEq(account.details.delegateBalance, 100e18);
-    assertEq(account.details.nextTwabIndex, 3);
-    assertEq(account.details.cardinality, 3);
+    assertEq(account.balance, 100e18);
+    assertEq(account.delegateBalance, 100e18);
+    assertEq(account.nextTwabIndex, 3);
+    assertEq(account.cardinality, 3);
 
     vm.warp(t3);
     vm.prank(mockVault);
     twabController.twabBurn(alice, 100e18);
     account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 0);
-    assertEq(account.details.delegateBalance, 0);
-    assertEq(account.details.nextTwabIndex, 4);
-    assertEq(account.details.cardinality, 4);
+    assertEq(account.balance, 0);
+    assertEq(account.delegateBalance, 0);
+    assertEq(account.nextTwabIndex, 4);
+    assertEq(account.cardinality, 4);
 
     vm.warp(t4);
     vm.prank(mockVault);
     twabController.twabMint(alice, 100e18);
     account = twabController.getAccount(mockVault, alice);
-    assertEq(account.details.balance, 100e18);
-    assertEq(account.details.delegateBalance, 100e18);
-    assertEq(account.details.nextTwabIndex, 4);
-    assertEq(account.details.cardinality, 4);
+    assertEq(account.balance, 100e18);
+    assertEq(account.delegateBalance, 100e18);
+    assertEq(account.nextTwabIndex, 4);
+    assertEq(account.cardinality, 4);
 
     assertEq(account.twabs[0].amount, 0);
     assertEq(account.twabs[1].amount, 8640000e18);

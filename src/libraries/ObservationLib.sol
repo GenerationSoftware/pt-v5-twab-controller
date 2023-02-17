@@ -47,13 +47,13 @@ library ObservationLib {
    * @return atOrAfter Observation recorded at, or after, the target.
    */
   function binarySearch(
-    Observation[MAX_CARDINALITY] storage _observations,
+    Observation[MAX_CARDINALITY] memory _observations,
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
     uint32 _target,
     uint16 _cardinality,
     uint32 _time
-  ) internal view returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
+  ) internal pure returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
     uint256 leftSide = _oldestObservationIndex;
     uint256 rightSide = _newestObservationIndex < leftSide
       ? leftSide + _cardinality - 1

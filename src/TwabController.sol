@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { TwabLib, Account, AccountDetails } from "./libraries/TwabLib.sol";
+import { TwabLib, Account } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";
 import { ExtendedSafeCastLib } from "./libraries/ExtendedSafeCastLib.sol";
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
@@ -24,7 +24,7 @@ contract TwabController {
   /**
    * @notice Allows users to revoke their chances to win by delegating to the
               sponsorship address.
-   * @dev    The user Account.AccountDetails.cardinality parameter can NOT exceed the max
+   * @dev    The user Account.cardinality parameter can NOT exceed the max
               cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new
               observation checkpoints.
               The MAX_CARDINALITY in fact guarantees at least 1 year of records.
@@ -46,7 +46,7 @@ contract TwabController {
 
   event NewUserTwab(
     address indexed vault,
-    address indexed delegate,
+    address indexed account,
     ObservationLib.Observation newTwab
   );
 
@@ -57,15 +57,15 @@ contract TwabController {
   /* ============ External Read Functions ============ */
 
   function balanceOf(address vault, address user) external view returns (uint256) {
-    return userTwabs[vault][user].details.balance;
+    return userTwabs[vault][user].balance;
   }
 
   function totalSupply(address vault) external view returns (uint256) {
-    return totalSupplyTwab[vault].details.balance;
+    return totalSupplyTwab[vault].balance;
   }
 
   function totalSupplyDelegateBalance(address vault) external view returns (uint256) {
-    return totalSupplyTwab[vault].details.delegateBalance;
+    return totalSupplyTwab[vault].delegateBalance;
   }
 
   function delegateOf(address _vault, address _user) external view returns (address) {
@@ -73,18 +73,11 @@ contract TwabController {
   }
 
   function delegateBalanceOf(address vault, address user) external view returns (uint256) {
-    return userTwabs[vault][user].details.delegateBalance;
+    return userTwabs[vault][user].delegateBalance;
   }
 
   function getAccount(address vault, address _user) external view returns (Account memory) {
     return userTwabs[vault][_user];
-  }
-
-  function getAccountDetails(
-    address vault,
-    address _user
-  ) external view returns (AccountDetails memory) {
-    return userTwabs[vault][_user].details;
   }
 
   function getBalanceAt(
@@ -92,25 +85,11 @@ contract TwabController {
     address _user,
     uint64 _target
   ) external view returns (uint256) {
-    Account storage account = userTwabs[vault][_user];
-
-    return
-      TwabLib.getBalanceAt(
-        account.twabs,
-        account.details,
-        uint32(_target),
-        uint32(block.timestamp)
-      );
+    return TwabLib.getBalanceAt(userTwabs[vault][_user], uint32(_target));
   }
 
   function getTotalSupplyAt(address vault, uint64 _target) external view returns (uint256) {
-    return
-      TwabLib.getBalanceAt(
-        totalSupplyTwab[vault].twabs,
-        totalSupplyTwab[vault].details,
-        uint32(_target),
-        uint32(block.timestamp)
-      );
+    return TwabLib.getBalanceAt(totalSupplyTwab[vault], uint32(_target));
   }
 
   function getAverageBalanceBetween(
@@ -119,15 +98,11 @@ contract TwabController {
     uint64 _startTime,
     uint64 _endTime
   ) external view returns (uint256) {
-    Account storage account = userTwabs[vault][_user];
-
     return
       TwabLib.getAverageBalanceBetween(
-        account.twabs,
-        account.details,
+        userTwabs[vault][_user],
         uint32(_startTime),
-        uint32(_endTime),
-        uint32(block.timestamp)
+        uint32(_endTime)
       );
   }
 
@@ -138,11 +113,9 @@ contract TwabController {
   ) external view returns (uint256) {
     return
       TwabLib.getAverageBalanceBetween(
-        totalSupplyTwab[vault].twabs,
-        totalSupplyTwab[vault].details,
+        totalSupplyTwab[vault],
         uint32(_startTime),
-        uint32(_endTime),
-        uint32(block.timestamp)
+        uint32(_endTime)
       );
   }
 
@@ -150,14 +123,14 @@ contract TwabController {
     address vault,
     address _user
   ) external view returns (uint16 index, ObservationLib.Observation memory twab) {
-    return TwabLib.newestTwab(userTwabs[vault][_user].twabs, userTwabs[vault][_user].details);
+    return TwabLib.newestTwab(userTwabs[vault][_user]);
   }
 
   function getOldestTwab(
     address vault,
     address _user
   ) external view returns (uint16 index, ObservationLib.Observation memory twab) {
-    return TwabLib.oldestTwab(userTwabs[vault][_user].twabs, userTwabs[vault][_user].details);
+    return TwabLib.oldestTwab(userTwabs[vault][_user]);
   }
 
   /* ============ External Write Functions ============ */
@@ -202,33 +175,22 @@ contract TwabController {
       address _fromDelegate = _delegateOf(_vault, _from);
 
       if (_fromDelegate != SPONSORSHIP_ADDRESS) {
-        _decreaseBalances(
-          _vault,
-          _fromDelegate,
-          0,
-          _amount
-        );
+        _decreaseBalances(_vault, _fromDelegate, 0, _amount);
       }
 
-      _decreaseBalances(
-        _vault,
-        _from,
-        _amount,
-        _fromDelegate == _from ? _amount : 0
-      );
+      _decreaseBalances(_vault, _from, _amount, _fromDelegate == _from ? _amount : 0);
 
       /**
-        * fromDelegate = delegateOf(_vault, _from);
-        * If fromDelegate == from we want to decreaseBalances
-        * => decreaseBalances(from, 100, 100);
-        * Else if fromDelegate != SPONSORSHIP_ADDRESS
-        * we need to decrease to delegateBalance and from balance
-        * decreaseBalances(from, 100, 0);
-        * decreaseBalances(fromDelegate, 0, 100);
-        * Else
-        * decreaseBalances(from, 100, 0);
+       * fromDelegate = delegateOf(_vault, _from);
+       * If fromDelegate == from we want to decreaseBalances
+       * => decreaseBalances(from, 100, 100);
+       * Else if fromDelegate != SPONSORSHIP_ADDRESS
+       * we need to decrease to delegateBalance and from balance
+       * decreaseBalances(from, 100, 0);
+       * decreaseBalances(fromDelegate, 0, 100);
+       * Else
+       * decreaseBalances(from, 100, 0);
        */
-
 
       // burn
       if (_to == address(0)) {
@@ -245,20 +207,10 @@ contract TwabController {
       address _toDelegate = _delegateOf(_vault, _to);
 
       if (_toDelegate != SPONSORSHIP_ADDRESS) {
-        _increaseBalances(
-          _vault,
-          _toDelegate,
-          0,
-          _amount
-        );
+        _increaseBalances(_vault, _toDelegate, 0, _amount);
       }
 
-      _increaseBalances(
-        _vault,
-        _from,
-        _amount,
-        _toDelegate == _to ? _amount : 0
-      );
+      _increaseBalances(_vault, _from, _amount, _toDelegate == _to ? _amount : 0);
 
       // mint
       if (_from == address(0)) {
@@ -271,7 +223,7 @@ contract TwabController {
     }
   }
 
-  function _delegateOf(address _vault, address _user) internal view returns(address) {
+  function _delegateOf(address _vault, address _user) internal view returns (address) {
     address _userDelegate;
 
     if (_user != address(0)) {
@@ -304,12 +256,7 @@ contract TwabController {
 
     // If we are transferring tokens from an undelegated account to a delegated account
     if (_toDelegate != address(0)) {
-      _increaseBalances(
-        _vault,
-        _toDelegate,
-        0,
-        _delegateAmount
-      );
+      _increaseBalances(_vault, _toDelegate, 0, _delegateAmount);
 
       // mint
       if (_fromDelegate == address(0) || _fromDelegate == SPONSORSHIP_ADDRESS) {
@@ -331,7 +278,7 @@ contract TwabController {
       _vault,
       _currentDelegate,
       _toDelegate,
-      userTwabs[_vault][_from].details.balance
+      userTwabs[_vault][_from].balance
     );
 
     emit Delegated(_vault, _from, _toDelegate);
@@ -343,17 +290,13 @@ contract TwabController {
     uint256 _amount,
     uint256 _delegateAmount
   ) internal {
-    (
-      ObservationLib.Observation memory _twab,
-      bool _isNew
-    ) = TwabLib.increaseBalances(
-        userTwabs[_vault][_account],
-        uint112(_amount),
-        uint112(_delegateAmount),
-        uint32(block.timestamp)
-      );
+    (ObservationLib.Observation memory _twab, bool _isNewTwab) = TwabLib.increaseBalances(
+      userTwabs[_vault][_account],
+      uint112(_amount),
+      uint112(_delegateAmount)
+    );
 
-    if (_isNew) {
+    if (_isNewTwab) {
       emit NewUserTwab(_vault, _account, _twab);
     }
   }
@@ -364,18 +307,14 @@ contract TwabController {
     uint256 _amount,
     uint256 _delegateAmount
   ) internal {
-    (
-      ObservationLib.Observation memory _twab,
-      bool _isNew
-    ) = TwabLib.decreaseBalances(
-        userTwabs[_vault][_account],
-        uint112(_amount),
-        uint112(_delegateAmount),
-        "TwabController/twab-burn-lt-delegate-balance",
-        uint32(block.timestamp)
-      );
+    (ObservationLib.Observation memory _twab, bool _isNewTwab) = TwabLib.decreaseBalances(
+      userTwabs[_vault][_account],
+      uint112(_amount),
+      uint112(_delegateAmount),
+      "TwabController/twab-burn-lt-delegate-balance"
+    );
 
-    if (_isNew) {
+    if (_isNewTwab) {
       emit NewUserTwab(_vault, _account, _twab);
     }
   }
@@ -389,18 +328,14 @@ contract TwabController {
       return;
     }
 
-    (
-      ObservationLib.Observation memory _totalSupply,
-      bool _tsIsNew
-    ) = TwabLib.decreaseBalances(
+    (ObservationLib.Observation memory _totalSupply, bool _tsIsNewTwab) = TwabLib.decreaseBalances(
       totalSupplyTwab[_vault],
       uint112(_amount),
       uint112(_delegateAmount),
-      "TwabController/burn-amount-exceeds-total-supply-balance",
-      uint32(block.timestamp)
+      "TwabController/burn-amount-exceeds-total-supply-balance"
     );
 
-    if (_tsIsNew) {
+    if (_tsIsNewTwab) {
       emit NewTotalSupplyTwab(_vault, _totalSupply);
     }
   }
@@ -414,17 +349,13 @@ contract TwabController {
       return;
     }
 
-    (
-      ObservationLib.Observation memory _totalSupply,
-      bool _tsIsNew
-    ) = TwabLib.increaseBalances(
+    (ObservationLib.Observation memory _totalSupply, bool _tsIsNewTwab) = TwabLib.increaseBalances(
       totalSupplyTwab[_vault],
       uint112(_amount),
-      uint112(_delegateAmount),
-      uint32(block.timestamp)
+      uint112(_delegateAmount)
     );
 
-    if (_tsIsNew) {
+    if (_tsIsNewTwab) {
       emit NewTotalSupplyTwab(_vault, _totalSupply);
     }
   }
