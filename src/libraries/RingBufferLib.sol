@@ -55,7 +55,7 @@ library RingBufferLib {
   /// @notice Computes the ring buffer index that preceeds the given one, wrapped by cardinality
   /// @param _index The index to increment
   /// @param _cardinality The number of elements in the Ring Buffer
-  /// @return The next index relative to the given index.  Will wrap around to the end if the prev index == 0
+  /// @return The prev index relative to the given index.  Will wrap around to the end if the prev index == 0
   function prevIndex(uint256 _index, uint256 _cardinality) internal pure returns (uint256) {
     return wrap(_index == 0 ? _cardinality - 1 : _index - 1, _cardinality);
   }

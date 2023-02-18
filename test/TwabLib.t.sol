@@ -510,14 +510,13 @@ contract TwabLibTest is BaseSetup {
     assertEq(_balance, 0);
   }
 
-  // TODO: same test than above?
   function testDelegateBalanceAtSingleTwabAtOrAfter() public {
-    (, uint32 _currentTimestamp) = getBalanceAtSetup();
+    (uint32 _initialTimestamp, uint32 _currentTimestamp) = getBalanceAtSetup();
 
     vm.warp(_currentTimestamp);
-    uint256 _balance = TwabLib.getBalanceAt(account, 500);
+    uint256 _balance = TwabLib.getBalanceAt(account, _initialTimestamp);
 
-    assertEq(_balance, 0);
+    assertEq(_balance, 1000);
   }
 
   function testProblematicQuery() public {

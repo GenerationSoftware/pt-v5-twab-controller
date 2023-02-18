@@ -30,11 +30,11 @@ struct Account {
  * @author PoolTogether Inc Team
  * @dev    Time-Weighted Average Balance Library for ERC20 tokens.
  * @notice This TwabLib adds on-chain historical lookups to a user(s) time-weighted average balance.
-              Each user is mapped to an Account struct containing the TWAB history (ring buffer) and
-              ring buffer parameters. Every token.transfer() creates a new TWAB checkpoint. The new
-              TWAB checkpoint is stored in the circular ring buffer, as either a new checkpoint or
-              rewriting a previous checkpoint with new parameters. One checkpoint per day is stored.
-              The TwabLib guarantees minimum 1 year of search history.
+ *         Each user is mapped to an Account struct containing the TWAB history (ring buffer) and
+ *         ring buffer parameters. Every token.transfer() creates a new TWAB checkpoint. The new
+ *         TWAB checkpoint is stored in the circular ring buffer, as either a new checkpoint or
+ *         rewriting a previous checkpoint with new parameters. One checkpoint per day is stored.
+ *         The TwabLib guarantees minimum 1 year of search history.
  */
 library TwabLib {
   using OverflowSafeComparatorLib for uint32;
@@ -42,14 +42,10 @@ library TwabLib {
 
   /**
    * @notice Sets max ring buffer length in the Account.twabs Observation list.
-              As users transfer/mint/burn tickets new Observation checkpoints are recorded.
-              The current max cardinality guarantees a seven year minimum, of accurate historical
-              lookups with current estimates of 1 new block every 15 seconds - assuming each block
-              contains a transfer to trigger an observation write to storage.
-   * @dev    The user Account.Account.cardinality parameter can NOT exceed the max
-              cardinality variable. Preventing "corrupted" ring buffer lookup pointers and new
-              observation checkpoints.
-              The MAX_CARDINALITY in fact guarantees at least 1 year of records.
+   *         As users transfer/mint/burn tickets new Observation checkpoints are recorded.
+   *         The current `MAX_CARDINALITY` guarantees a one year minimum, of accurate historical lookups.
+   * @dev The user Account.Account.cardinality parameter can NOT exceed the max cardinality variable.
+   *      Preventing "corrupted" ring buffer lookup pointers and new observation checkpoints.
    */
   uint16 public constant MAX_CARDINALITY = 365; // 1 year
 
@@ -121,7 +117,6 @@ library TwabLib {
     _endTime = _endTime > _currentTime ? _currentTime : _endTime;
 
     (uint16 oldestTwabIndex, ObservationLib.Observation memory oldTwab) = oldestTwab(_account);
-
     (uint16 newestTwabIndex, ObservationLib.Observation memory newTwab) = newestTwab(_account);
 
     ObservationLib.Observation memory startTwab = _calculateTwab(
@@ -208,6 +203,7 @@ library TwabLib {
     }
 
     uint16 oldestTwabIndex;
+
     // Now, set before to the oldest TWAB
     (oldestTwabIndex, beforeOrAt) = oldestTwab(_account);
 
