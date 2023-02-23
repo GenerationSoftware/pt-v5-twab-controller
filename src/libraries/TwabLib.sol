@@ -7,49 +7,6 @@ import "./OverflowSafeComparatorLib.sol";
 import "./RingBufferLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
 
-// /**
-//   * @notice Struct ring buffer parameters for single user Account.
-//   * @param balance           Current token balance for an Account
-//   * @param delegateBalance   Current delegate balance for an Account (active balance for chance)
-//   * @param nextTwabIndex     Next uninitialized or updatable ring buffer checkpoint storage slot
-//   * @param cardinality       Current total "initialized" ring buffer checkpoints for single user Account.
-//   *                          Used to set initial boundary conditions for an efficient binary search.
-//   */
-// struct AccountDetails {
-//   uint112 balance;
-//   uint112 delegateBalance;
-//   uint16 nextTwabIndex;
-//   uint16 cardinality;
-// }
-
-// /**
-//  * @notice Account details and historical twabs.
-//  * @param details The account details
-//  * @param twabs The history of twabs for this account
-//  */
-// struct Account {
-//   AccountDetails details;
-//   ObservationLib.Observation[MAX_CARDINALITY] twabs;
-// }
-
-/**
- * @notice Account balances and historical twabs.
- * @param balance           Current token balance for an Account
- * @param delegateBalance   Current delegate balance for an Account (active balance for chance)
- * @param nextTwabIndex     Next uninitialized or updatable ring buffer checkpoint storage slot
- * @param cardinality       Current total "initialized" ring buffer checkpoints for single user Account.
- *                          Used to set initial boundary conditions for an efficient binary search.
- * @param details The account details
- * @param twabs The history of twabs for this account
- */
-struct Account {
-  uint112 balance;
-  uint112 delegateBalance;
-  uint16 nextTwabIndex;
-  uint16 cardinality;
-  ObservationLib.Observation[MAX_CARDINALITY] twabs;
-}
-
 /**
  * @title  PoolTogether V5 TwabLib (Library)
  * @author PoolTogether Inc Team
@@ -66,24 +23,59 @@ library TwabLib {
   using ExtendedSafeCastLib for uint256;
 
   /**
+   * @notice Struct ring buffer parameters for single user Account.
+   * @param balance           Current token balance for an Account
+   * @param delegateBalance   Current delegate balance for an Account (active balance for chance)
+   * @param nextTwabIndex     Next uninitialized or updatable ring buffer checkpoint storage slot
+   * @param cardinality       Current total "initialized" ring buffer checkpoints for single user Account.
+   *                          Used to set initial boundary conditions for an efficient binary search.
+   */
+  struct AccountDetails {
+    uint112 balance;
+    uint112 delegateBalance;
+    uint16 nextTwabIndex;
+    uint16 cardinality;
+  }
+
+  /**
+   * @notice Account details and historical twabs.
+   * @param details The account details
+   * @param twabs The history of twabs for this account
+   */
+  struct Account {
+    AccountDetails details;
+    ObservationLib.Observation[MAX_CARDINALITY] twabs;
+  }
+
+  /**
    * @notice Increases an account's delegate balance and records a new twab.
    * @param _account          The account whose delegateBalance will be increased
    * @param _amount           The amount to increase the balance by
    * @param _delegateAmount   The amount to increase the delegateBalance by
-   * @return twab             The user's latest TWAB
-   * @return isNewTwab            Whether the TWAB is new
+   * @return accountDetails Updated AccountDetails struct
+   * @return twab           The user's latest TWAB
+   * @return isNewTwab      Whether TWAB is new or calling twice in the same block
    */
   function increaseBalances(
     Account storage _account,
     uint112 _amount,
     uint112 _delegateAmount
-  ) internal returns (ObservationLib.Observation memory twab, bool isNewTwab) {
+  )
+    internal
+    returns (
+      AccountDetails memory accountDetails,
+      ObservationLib.Observation memory twab,
+      bool isNewTwab
+    )
+  {
+    accountDetails = _account.details;
+
     if (_delegateAmount != uint112(0)) {
-      (twab, isNewTwab) = _nextTwab(_account);
+      (accountDetails, twab, isNewTwab) = _nextTwab(_account.twabs, accountDetails);
     }
 
-    _account.balance += _amount;
-    _account.delegateBalance += _delegateAmount;
+    accountDetails.balance += _amount;
+    accountDetails.delegateBalance += _delegateAmount;
   }
 
   /**
@@ -91,52 +83,71 @@ library TwabLib {
    * @dev    With Account struct and amount decreasing calculates the next TWAB observable checkpoint.
    * @param _account        Account whose delegateBalance will be decreased
    * @param _amount         Amount to decrease the delegateBalance by
-   * @param _delegateAmount   The amount to increase the delegateBalance by
+   * @param _delegateAmount The amount to increase the delegateBalance by
    * @param _revertMessage  Revert message for insufficient delegateBalance
+   * @return accountDetails Updated AccountDetails struct
    * @return twab           TWAB observation (with decreasing average)
-   * @return isNewTwab          Whether TWAB is new or calling twice in the same block
+   * @return isNewTwab      Whether TWAB is new or calling twice in the same block
    */
   function decreaseBalances(
     Account storage _account,
     uint112 _amount,
     uint112 _delegateAmount,
     string memory _revertMessage
-  ) internal returns (ObservationLib.Observation memory twab, bool isNewTwab) {
-    require(_account.balance >= _amount, _revertMessage);
-    require(_account.delegateBalance >= _delegateAmount, _revertMessage);
+  )
+    internal
+    returns (
+      AccountDetails memory accountDetails,
+      ObservationLib.Observation memory twab,
+      bool isNewTwab
+    )
+  {
+    accountDetails = _account.details;
+
+    require(accountDetails.balance >= _amount, _revertMessage);
+    require(accountDetails.delegateBalance >= _delegateAmount, _revertMessage);
 
     if (_delegateAmount != uint112(0)) {
-      (twab, isNewTwab) = _nextTwab(_account);
+      (accountDetails, twab, isNewTwab) = _nextTwab(_account.twabs, accountDetails);
     }
 
     unchecked {
-      _account.balance -= _amount;
-      _account.delegateBalance -= _delegateAmount;
+      accountDetails.balance -= _amount;
+      accountDetails.delegateBalance -= _delegateAmount;
     }
   }
 
   /**
    * @notice Calculates the average balance held by a user for a given time frame.
-   * @dev    Finds the average balance between start and end timestamp epochs.
-   *             Validates the supplied end time is within the range of elapsed time i.e. less then timestamp of now.
-   * @param _account User Account struct loaded in memory
+   * @dev Finds the average balance between start and end timestamp epochs.
+   *      Validates the supplied end time is within the range of elapsed time i.e. less then timestamp of now.
+   * @param _twabs          Individual user Observation recorded checkpoints passed as storage pointer
+   * @param _accountDetails User AccountDetails struct loaded in memory
    * @param _startTime      Start of timestamp range as an epoch
    * @param _endTime        End of timestamp range as an epoch
-   * @return uint256        Average balance of user held between epoch timestamps start and end
+   * @return uint256 Average balance of user held between epoch timestamps start and end
    */
   function getAverageBalanceBetween(
-    Account storage _account,
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
+    AccountDetails memory _accountDetails,
     uint32 _startTime,
     uint32 _endTime
   ) internal view returns (uint256) {
     uint32 _currentTime = uint32(block.timestamp);
     _endTime = _endTime > _currentTime ? _currentTime : _endTime;
 
-    (uint16 oldestTwabIndex, ObservationLib.Observation memory oldTwab) = oldestTwab(_account);
-    (uint16 newestTwabIndex, ObservationLib.Observation memory newTwab) = newestTwab(_account);
+    (uint16 oldestTwabIndex, ObservationLib.Observation memory oldTwab) = oldestTwab(
+      _twabs,
+      _accountDetails
+    );
+    (uint16 newestTwabIndex, ObservationLib.Observation memory newTwab) = newestTwab(
+      _twabs,
+      _accountDetails
+    );
 
     ObservationLib.Observation memory startTwab = _calculateTwab(
-      _account,
+      _twabs,
+      _accountDetails,
       newTwab,
       oldTwab,
       newestTwabIndex,
@@ -146,7 +157,8 @@ library TwabLib {
     );
 
     ObservationLib.Observation memory endTwab = _calculateTwab(
-      _account,
+      _twabs,
+      _accountDetails,
       newTwab,
       oldTwab,
       newestTwabIndex,
@@ -163,44 +175,50 @@ library TwabLib {
 
   /**
    * @notice Retrieves the oldest TWAB
-   * @param _account Account
+   * @param _twabs The twabs array to insert into
+   * @param _accountDetails The current accountDetails
    * @return index The index of the oldest TWAB in the twabs array
    * @return twab The oldest TWAB
    */
   function oldestTwab(
-    Account storage _account
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
+    AccountDetails memory _accountDetails
   ) internal view returns (uint16 index, ObservationLib.Observation memory twab) {
-    index = _account.nextTwabIndex;
-    twab = _account.twabs[index];
+    index = _accountDetails.nextTwabIndex;
+    twab = _twabs[index];
 
     // If the TWAB is not initialized we go to the beginning of the TWAB circular buffer at index 0
     if (twab.timestamp == 0) {
       index = 0;
-      twab = _account.twabs[0];
+      twab = _twabs[0];
     }
   }
 
   /**
    * @notice Retrieves the newest TWAB
-   * @param _account  Account
+   * @param _twabs The twabs array to insert into
+   * @param _accountDetails The current accountDetails
    * @return index The index of the newest TWAB in the twabs array
    * @return twab The newest TWAB
    */
   function newestTwab(
-    Account storage _account
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
+    AccountDetails memory _accountDetails
   ) internal view returns (uint16 index, ObservationLib.Observation memory twab) {
-    index = uint16(RingBufferLib.newestIndex(_account.nextTwabIndex, MAX_CARDINALITY));
-    twab = _account.twabs[index];
+    index = uint16(RingBufferLib.newestIndex(_accountDetails.nextTwabIndex, MAX_CARDINALITY));
+    twab = _twabs[index];
   }
 
   /**
    * @notice Retrieves amount at `_targetTime` timestamp
-   * @param _account Account
+   * @param _twabs Individual user Observation recorded checkpoints passed as storage pointer
+   * @param _accountDetails User AccountDetails struct loaded in memory
    * @param _targetTime Timestamp at which the reserved TWAB should be for
    * @return uint256    TWAB amount at `_targetTime`.
    */
   function getBalanceAt(
-    Account storage _account,
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
+    AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) internal view returns (uint256) {
     uint32 _currentTime = uint32(block.timestamp);
@@ -209,19 +227,18 @@ library TwabLib {
     uint16 newestTwabIndex;
     ObservationLib.Observation memory afterOrAt;
     ObservationLib.Observation memory beforeOrAt;
-    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs = _account.twabs;
 
-    (newestTwabIndex, beforeOrAt) = newestTwab(_account);
+    (newestTwabIndex, beforeOrAt) = newestTwab(_twabs, _accountDetails);
 
     // If `_targetTime` is chronologically after the newest TWAB, we can simply return the current balance
     if (beforeOrAt.timestamp.lte(_targetTime, _currentTime)) {
-      return _account.delegateBalance;
+      return _accountDetails.delegateBalance;
     }
 
     uint16 oldestTwabIndex;
 
     // Now, set before to the oldest TWAB
-    (oldestTwabIndex, beforeOrAt) = oldestTwab(_account);
+    (oldestTwabIndex, beforeOrAt) = oldestTwab(_twabs, _accountDetails);
 
     // If `_targetTime` is chronologically before the oldest TWAB, we can early return
     if (_targetTime.lt(beforeOrAt.timestamp, _currentTime)) {
@@ -234,7 +251,7 @@ library TwabLib {
       newestTwabIndex,
       oldestTwabIndex,
       _targetTime,
-      _account.cardinality,
+      _accountDetails.cardinality,
       _currentTime
     );
 
@@ -248,22 +265,24 @@ library TwabLib {
 
   /**
    * @notice Calculates a user TWAB for a target timestamp using the historical TWAB records.
-   *             The balance is linearly interpolated: amount differences / timestamp differences
-   *             using the simple (after.amount - before.amount / end.timestamp - start.timestamp) formula.
-   * /** @dev    Binary search in _calculateTwab fails when searching out of bounds. Thus, before
-   *             searching we exclude target timestamps out of range of newest/oldest TWAB(s).
-   *             IF a search is before or after the range we "extrapolate" a Observation from the expected state.
-   * @param _account   User Account struct loaded in memory
+   *         The balance is linearly interpolated: amount differences / timestamp differences
+   *         using the simple (after.amount - before.amount / end.timestamp - start.timestamp) formula.
+   * @dev Binary search in _calculateTwab fails when searching out of bounds. Thus, before
+   *      searching we exclude target timestamps out of range of newest/oldest TWAB(s).
+   *      IF a search is before or after the range we "extrapolate" a Observation from the expected state.
+   * @param _twabs            Individual user Observation recorded checkpoints passed as storage pointer
+   * @param _accountDetails   User AccountDetails struct loaded in memory
    * @param _newestTwab       Newest TWAB in history (end of ring buffer)
    * @param _oldestTwab       Olderst TWAB in history (end of ring buffer)
    * @param _newestTwabIndex  Pointer in ring buffer to newest TWAB
    * @param _oldestTwabIndex  Pointer in ring buffer to oldest TWAB
    * @param _targetTimestamp  Epoch timestamp to calculate for time (T) in the TWAB
    * @param _time             Block.timestamp
-   * @return account   Updated Account struct
+   * @return twabs Updated twabs struct
    */
   function _calculateTwab(
-    Account storage _account,
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
+    AccountDetails memory _accountDetails,
     ObservationLib.Observation memory _newestTwab,
     ObservationLib.Observation memory _oldestTwab,
     uint16 _newestTwabIndex,
@@ -273,7 +292,7 @@ library TwabLib {
   ) private view returns (ObservationLib.Observation memory) {
     // If `_targetTimestamp` is chronologically after the newest TWAB, we extrapolate a new one
     if (_newestTwab.timestamp.lt(_targetTimestamp, _time)) {
-      return _computeNextTwab(_newestTwab, _account.delegateBalance, _targetTimestamp);
+      return _computeNextTwab(_newestTwab, _accountDetails.delegateBalance, _targetTimestamp);
     }
 
     if (_newestTwab.timestamp == _targetTimestamp) {
@@ -294,11 +313,11 @@ library TwabLib {
       ObservationLib.Observation memory beforeOrAtStart,
       ObservationLib.Observation memory afterOrAtStart
     ) = ObservationLib.binarySearch(
-        _account.twabs,
+        _twabs,
         _newestTwabIndex,
         _oldestTwabIndex,
         _targetTimestamp,
-        _account.cardinality,
+        _accountDetails.cardinality,
         _time
       );
 
@@ -341,32 +360,42 @@ library TwabLib {
   /**
    * @notice Sets a new TWAB Observation at the next available index and returns the new account.
    * @dev Note that if `_currentTime` is before the last observation timestamp, it appears as an overflow.
-   * @param _account The current account
+   * @param _twabs The twabs array to insert into
+   * @param _accountDetails The current accountDetails
+   * @return accountDetails The new account details
    * @return twab The newest twab (may or may not be brand-new)
    * @return isNewTwab Whether the newest twab was created by this call
    */
   function _nextTwab(
-    Account storage _account
-  ) private returns (ObservationLib.Observation memory twab, bool isNewTwab) {
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
+    AccountDetails memory _accountDetails
+  )
+    private
+    returns (
+      AccountDetails memory accountDetails,
+      ObservationLib.Observation memory twab,
+      bool isNewTwab
+    )
+  {
     uint32 _currentTime = uint32(block.timestamp);
 
-    (, ObservationLib.Observation memory _newestTwab) = newestTwab(_account);
+    (, ObservationLib.Observation memory _newestTwab) = newestTwab(_twabs, _accountDetails);
 
     // if we're in the same block, return
     if (_newestTwab.timestamp == _currentTime) {
-      return (_newestTwab, false);
+      return (_accountDetails, _newestTwab, false);
     }
 
-    ObservationLib.Observation memory secondNewestTwab = _account.twabs[
+    ObservationLib.Observation memory secondNewestTwab = _twabs[
       RingBufferLib.prevIndex(
-        RingBufferLib.newestIndex(_account.nextTwabIndex, MAX_CARDINALITY),
+        RingBufferLib.newestIndex(_accountDetails.nextTwabIndex, MAX_CARDINALITY),
         MAX_CARDINALITY
       )
     ];
 
     ObservationLib.Observation memory _newTwab = _computeNextTwab(
       _newestTwab,
-      _account.delegateBalance,
+      _accountDetails.delegateBalance,
       _currentTime
     );
 
@@ -384,9 +413,9 @@ library TwabLib {
         _currentTime
       ) >= 1 days)
     ) {
-      _account.twabs[_account.nextTwabIndex] = _newTwab;
-      _account.nextTwabIndex = uint16(
-        RingBufferLib.nextIndex(_account.nextTwabIndex, MAX_CARDINALITY)
+      _twabs[_accountDetails.nextTwabIndex] = _newTwab;
+      _accountDetails.nextTwabIndex = uint16(
+        RingBufferLib.nextIndex(_accountDetails.nextTwabIndex, MAX_CARDINALITY)
       );
 
       // Prevent the Account specific cardinality from exceeding the MAX_CARDINALITY.
@@ -394,13 +423,13 @@ library TwabLib {
       // exceeds the max cardinality, new observations would be incorrectly set or the
       // observation would be out of "bounds" of the ring buffer. Once reached the
       // Account.cardinality will continue to be equal to max cardinality.
-      if (_account.cardinality < MAX_CARDINALITY) {
-        _account.cardinality += 1;
+      if (_accountDetails.cardinality < MAX_CARDINALITY) {
+        _accountDetails.cardinality += 1;
       }
     } else {
-      _account.twabs[RingBufferLib.newestIndex(_account.nextTwabIndex, MAX_CARDINALITY)] = _newTwab;
+      _twabs[RingBufferLib.newestIndex(_accountDetails.nextTwabIndex, MAX_CARDINALITY)] = _newTwab;
     }
 
-    return (_newTwab, true);
+    return (_accountDetails, _newTwab, true);
   }
 }
