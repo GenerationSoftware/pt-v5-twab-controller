@@ -8,6 +8,15 @@ import "./OverflowSafeComparatorLib.sol";
 import "./RingBufferLib.sol";
 
 /**
+ * @dev Sets max ring buffer length in the Account.twabs Observation list.
+ *         As users transfer/mint/burn tickets new Observation checkpoints are recorded.
+ *         The current `MAX_CARDINALITY` guarantees a one year minimum, of accurate historical lookups.
+ * @dev The user Account.Account.cardinality parameter can NOT exceed the max cardinality variable.
+ *      Preventing "corrupted" ring buffer lookup pointers and new observation checkpoints.
+ */
+uint16 constant MAX_CARDINALITY = 365; // 1 year
+
+/**
  * @title Observation Library
  * @notice This library allows one to store an array of timestamped values and efficiently binary search them.
  * @dev Largely pulled from Uniswap V3 Oracle.sol: https://github.com/Uniswap/v3-core/blob/c05a0e2c8c08c460fb4d05cfdda30b3ad8deeaac/contracts/libraries/Oracle.sol
@@ -16,9 +25,6 @@ import "./RingBufferLib.sol";
 library ObservationLib {
   using OverflowSafeComparatorLib for uint32;
   using SafeCast for uint256;
-
-  /// @notice The maximum number of observations
-  uint16 public constant MAX_CARDINALITY = 365; // 1 year
 
   /**
    * @notice Observation, which includes an amount and timestamp.
@@ -47,13 +53,13 @@ library ObservationLib {
    * @return atOrAfter Observation recorded at, or after, the target.
    */
   function binarySearch(
-    Observation[MAX_CARDINALITY] memory _observations,
+    Observation[MAX_CARDINALITY] storage _observations,
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
     uint32 _target,
     uint16 _cardinality,
     uint32 _time
-  ) internal pure returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
+  ) internal view returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
     uint256 leftSide = _oldestObservationIndex;
     uint256 rightSide = _newestObservationIndex < leftSide
       ? leftSide + _cardinality - 1

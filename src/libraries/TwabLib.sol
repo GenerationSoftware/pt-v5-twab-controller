@@ -5,7 +5,32 @@ pragma solidity 0.8.17;
 import "./ExtendedSafeCastLib.sol";
 import "./OverflowSafeComparatorLib.sol";
 import "./RingBufferLib.sol";
-import "./ObservationLib.sol";
+import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
+
+// /**
+//   * @notice Struct ring buffer parameters for single user Account.
+//   * @param balance           Current token balance for an Account
+//   * @param delegateBalance   Current delegate balance for an Account (active balance for chance)
+//   * @param nextTwabIndex     Next uninitialized or updatable ring buffer checkpoint storage slot
+//   * @param cardinality       Current total "initialized" ring buffer checkpoints for single user Account.
+//   *                          Used to set initial boundary conditions for an efficient binary search.
+//   */
+// struct AccountDetails {
+//   uint112 balance;
+//   uint112 delegateBalance;
+//   uint16 nextTwabIndex;
+//   uint16 cardinality;
+// }
+
+// /**
+//  * @notice Account details and historical twabs.
+//  * @param details The account details
+//  * @param twabs The history of twabs for this account
+//  */
+// struct Account {
+//   AccountDetails details;
+//   ObservationLib.Observation[MAX_CARDINALITY] twabs;
+// }
 
 /**
  * @notice Account balances and historical twabs.
@@ -22,7 +47,7 @@ struct Account {
   uint112 delegateBalance;
   uint16 nextTwabIndex;
   uint16 cardinality;
-  ObservationLib.Observation[365] twabs;
+  ObservationLib.Observation[MAX_CARDINALITY] twabs;
 }
 
 /**
@@ -39,15 +64,6 @@ struct Account {
 library TwabLib {
   using OverflowSafeComparatorLib for uint32;
   using ExtendedSafeCastLib for uint256;
-
-  /**
-   * @notice Sets max ring buffer length in the Account.twabs Observation list.
-   *         As users transfer/mint/burn tickets new Observation checkpoints are recorded.
-   *         The current `MAX_CARDINALITY` guarantees a one year minimum, of accurate historical lookups.
-   * @dev The user Account.Account.cardinality parameter can NOT exceed the max cardinality variable.
-   *      Preventing "corrupted" ring buffer lookup pointers and new observation checkpoints.
-   */
-  uint16 public constant MAX_CARDINALITY = 365; // 1 year
 
   /**
    * @notice Increases an account's delegate balance and records a new twab.
@@ -109,7 +125,7 @@ library TwabLib {
    * @return uint256        Average balance of user held between epoch timestamps start and end
    */
   function getAverageBalanceBetween(
-    Account memory _account,
+    Account storage _account,
     uint32 _startTime,
     uint32 _endTime
   ) internal view returns (uint256) {
@@ -152,8 +168,8 @@ library TwabLib {
    * @return twab The oldest TWAB
    */
   function oldestTwab(
-    Account memory _account
-  ) internal pure returns (uint16 index, ObservationLib.Observation memory twab) {
+    Account storage _account
+  ) internal view returns (uint16 index, ObservationLib.Observation memory twab) {
     index = _account.nextTwabIndex;
     twab = _account.twabs[index];
 
@@ -171,8 +187,8 @@ library TwabLib {
    * @return twab The newest TWAB
    */
   function newestTwab(
-    Account memory _account
-  ) internal pure returns (uint16 index, ObservationLib.Observation memory twab) {
+    Account storage _account
+  ) internal view returns (uint16 index, ObservationLib.Observation memory twab) {
     index = uint16(RingBufferLib.newestIndex(_account.nextTwabIndex, MAX_CARDINALITY));
     twab = _account.twabs[index];
   }
@@ -184,7 +200,7 @@ library TwabLib {
    * @return uint256    TWAB amount at `_targetTime`.
    */
   function getBalanceAt(
-    Account memory _account,
+    Account storage _account,
     uint32 _targetTime
   ) internal view returns (uint256) {
     uint32 _currentTime = uint32(block.timestamp);
@@ -193,7 +209,7 @@ library TwabLib {
     uint16 newestTwabIndex;
     ObservationLib.Observation memory afterOrAt;
     ObservationLib.Observation memory beforeOrAt;
-    ObservationLib.Observation[MAX_CARDINALITY] memory _twabs = _account.twabs;
+    ObservationLib.Observation[MAX_CARDINALITY] storage _twabs = _account.twabs;
 
     (newestTwabIndex, beforeOrAt) = newestTwab(_account);
 
@@ -247,14 +263,14 @@ library TwabLib {
    * @return account   Updated Account struct
    */
   function _calculateTwab(
-    Account memory _account,
+    Account storage _account,
     ObservationLib.Observation memory _newestTwab,
     ObservationLib.Observation memory _oldestTwab,
     uint16 _newestTwabIndex,
     uint16 _oldestTwabIndex,
     uint32 _targetTimestamp,
     uint32 _time
-  ) private pure returns (ObservationLib.Observation memory) {
+  ) private view returns (ObservationLib.Observation memory) {
     // If `_targetTimestamp` is chronologically after the newest TWAB, we extrapolate a new one
     if (_newestTwab.timestamp.lt(_targetTimestamp, _time)) {
       return _computeNextTwab(_newestTwab, _account.delegateBalance, _targetTimestamp);

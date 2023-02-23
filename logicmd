@@ -1,0 +1,19 @@
+mintTwab()
+=> should add amount to balance
+=> should add amount to either own delegateBalance or delegated user delegateBalance
+=> should add a new observation for the delegateBalance change => updates Account for user and delegateTotalSupply => update nextTwabIndex
+
+burnTwab()
+=> should subtract amount from balance
+=> should subtract amount from either own delegateBalance or delegated user delegateBalance
+=> should add a new observation for the delegateBalance change => updates Account for user and delegateTotalSupply => update nextTwabIndex
+
+transferTwab()
+=> should subtract amount from sender balance and add it to receiver balance
+=> should subtract amount from sender delegateBalance and add it to receiver degateBalance
+=> should add a new observation for the sender delegateBalance and receiver delegateBalance change => updates Account for sender and receiver => update nextTwabIndex for sender and receiver
+
+delegateTwab()
+=> should not update balance
+=> should subtract total amount from sender delegateBalance and add it to receiver degateBalance
+=> should add a new observation for the sender delegateBalance and receiver delegateBalance change => updates Account for sender and receiver => update nextTwabIndex for sender and receiver
