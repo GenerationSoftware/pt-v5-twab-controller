@@ -8,6 +8,15 @@ import "./OverflowSafeComparatorLib.sol";
 import "./RingBufferLib.sol";
 
 /**
+ * @dev Sets max ring buffer length in the Account.twabs Observation list.
+ *         As users transfer/mint/burn tickets new Observation checkpoints are recorded.
+ *         The current `MAX_CARDINALITY` guarantees a one year minimum, of accurate historical lookups.
+ * @dev The user Account.Account.cardinality parameter can NOT exceed the max cardinality variable.
+ *      Preventing "corrupted" ring buffer lookup pointers and new observation checkpoints.
+ */
+uint16 constant MAX_CARDINALITY = 365; // 1 year
+
+/**
  * @title Observation Library
  * @notice This library allows one to store an array of timestamped values and efficiently binary search them.
  * @dev Largely pulled from Uniswap V3 Oracle.sol: https://github.com/Uniswap/v3-core/blob/c05a0e2c8c08c460fb4d05cfdda30b3ad8deeaac/contracts/libraries/Oracle.sol
@@ -16,9 +25,6 @@ import "./RingBufferLib.sol";
 library ObservationLib {
   using OverflowSafeComparatorLib for uint32;
   using SafeCast for uint256;
-
-  /// @notice The maximum number of observations
-  uint16 public constant MAX_CARDINALITY = 365; // 1 year
 
   /**
    * @notice Observation, which includes an amount and timestamp.

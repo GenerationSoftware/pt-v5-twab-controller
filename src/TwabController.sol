@@ -6,8 +6,23 @@ import { ObservationLib } from "./libraries/ObservationLib.sol";
 import { ExtendedSafeCastLib } from "./libraries/ExtendedSafeCastLib.sol";
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 
+/**
+ * @title  PoolTogether V5 TwabController
+ * @author PoolTogether Inc Team
+ * @dev    Time-Weighted Average Balance Controller for ERC20 tokens.
+ * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical
+              lookups to a user(s) time-weighted average balance. Each user is mapped to an
+              Account struct containing the TWAB history (ring buffer) and ring buffer parameters.
+              Every token.transfer() creates a new TWAB checkpoint. The new TWAB checkpoint is
+              stored in the circular ring buffer, as either a new checkpoint or rewriting a
+              previous checkpoint with new parameters. One checkpoint per day is stored.
+              The TwabLib guarantees minimum 1 year of search history.
+ */
 contract TwabController {
   using ExtendedSafeCastLib for uint256;
+
+  /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
+  address public constant SPONSORSHIP_ADDRESS = address(1);
 
   /* ============ State ============ */
 
@@ -24,7 +39,7 @@ contract TwabController {
 
   event NewUserTwab(
     address indexed vault,
-    address indexed delegate,
+    address indexed user,
     ObservationLib.Observation newTwab
   );
 
@@ -32,319 +47,313 @@ contract TwabController {
 
   event NewTotalSupplyTwab(address indexed vault, ObservationLib.Observation newTotalSupplyTwab);
 
-  /* ============ External Functions ============ */
+  /* ============ External Read Functions ============ */
 
-  function getAccountDetails(
-    address vault,
-    address _user
-  ) external returns (TwabLib.AccountDetails memory) {
-    return userTwabs[vault][_user].details;
-  }
-
-  function balanceOf(address vault, address user) external returns (uint256) {
+  function balanceOf(address vault, address user) external view returns (uint256) {
     return userTwabs[vault][user].details.balance;
   }
 
-  function getBalanceAt(address vault, address _user, uint64 _target) external returns (uint256) {
-    TwabLib.Account storage account = userTwabs[vault][_user];
-
-    return
-      TwabLib.getBalanceAt(
-        account.twabs,
-        account.details,
-        uint32(_target),
-        uint32(block.timestamp)
-      );
-  }
-
-  function getAverageBalancesBetween(
-    address vault,
-    address _user,
-    uint64[] calldata _startTimes,
-    uint64[] calldata _endTimes
-  ) external returns (uint256[] memory) {
-    return _getAverageBalancesBetween(userTwabs[vault][_user], _startTimes, _endTimes);
-  }
-
-  function getAverageTotalSuppliesBetween(
-    address vault,
-    uint64[] calldata _startTimes,
-    uint64[] calldata _endTimes
-  ) external returns (uint256[] memory) {
-    return _getAverageBalancesBetween(totalSupplyTwab[vault], _startTimes, _endTimes);
-  }
-
-  function getAverageBalanceBetween(
-    address vault,
-    address _user,
-    uint64 _startTime,
-    uint64 _endTime
-  ) external returns (uint256) {
-    TwabLib.Account storage account = userTwabs[vault][_user];
-
-    return
-      TwabLib.getAverageBalanceBetween(
-        account.twabs,
-        account.details,
-        uint32(_startTime),
-        uint32(_endTime),
-        uint32(block.timestamp)
-      );
-  }
-
-  function getBalancesAt(
-    address vault,
-    address _user,
-    uint64[] calldata _targets
-  ) external returns (uint256[] memory) {
-    uint256 length = _targets.length;
-    uint256[] memory _balances = new uint256[](length);
-
-    TwabLib.Account storage twabContext = userTwabs[vault][_user];
-    TwabLib.AccountDetails memory details = twabContext.details;
-
-    for (uint256 i = 0; i < length; i++) {
-      _balances[i] = TwabLib.getBalanceAt(
-        twabContext.twabs,
-        details,
-        uint32(_targets[i]),
-        uint32(block.timestamp)
-      );
-    }
-
-    return _balances;
-  }
-
-  function getTotalSupplyAt(address vault, uint64 _target) external returns (uint256) {
-    return
-      TwabLib.getBalanceAt(
-        totalSupplyTwab[vault].twabs,
-        totalSupplyTwab[vault].details,
-        uint32(_target),
-        uint32(block.timestamp)
-      );
-  }
-
-  function getTotalSuppliesAt(
-    address vault,
-    uint64[] calldata _targets
-  ) external returns (uint256[] memory) {
-    uint256 length = _targets.length;
-    uint256[] memory totalSupplies = new uint256[](length);
-
-    TwabLib.AccountDetails memory details = totalSupplyTwab[vault].details;
-
-    for (uint256 i = 0; i < length; i++) {
-      totalSupplies[i] = TwabLib.getBalanceAt(
-        totalSupplyTwab[vault].twabs,
-        details,
-        uint32(_targets[i]),
-        uint32(block.timestamp)
-      );
-    }
-
-    return totalSupplies;
-  }
-
-  function totalSupply(address vault) external returns (uint256) {
+  function totalSupply(address vault) external view returns (uint256) {
     return totalSupplyTwab[vault].details.balance;
   }
 
-  function mint(address vault, address _to, uint256 _amount) external {
-    _transfer(vault, address(0), _to, _amount);
+  function totalSupplyDelegateBalance(address vault) external view returns (uint256) {
+    return totalSupplyTwab[vault].details.delegateBalance;
   }
 
-  function burn(address vault, address _from, uint256 _amount) external {
-    _transfer(vault, _from, address(0), _amount);
+  function delegateOf(address _vault, address _user) external view returns (address) {
+    return _delegateOf(_vault, _user);
   }
 
-  function twabTransfer(address vault, address _from, address _to, uint256 _amount) external {
-    _transfer(vault, _from, _to, _amount);
-  }
-
-  function _transfer(address vault, address _from, address _to, uint256 _amount) internal {
-    if (_from == _to) {
-      return;
-    }
-
-    // Minting
-    address _fromDelegate;
-    if (_from != address(0)) {
-      _fromDelegate = delegates[vault][_from];
-    }
-
-    // Burning
-    address _toDelegate;
-    if (_to != address(0)) {
-      _toDelegate = delegates[vault][_to];
-    }
-
-    _transferTwab(vault, _fromDelegate, _toDelegate, _amount);
-  }
-
-  function delegateOf(address vault, address _user) external returns (address) {
-    return delegates[vault][_user];
-  }
-
-  function delegateBalanceOf(address vault, address user) external returns (uint256) {
+  function delegateBalanceOf(address vault, address user) external view returns (uint256) {
     return userTwabs[vault][user].details.delegateBalance;
   }
 
-  function delegate(address vault, address _from, address _to) external {
-    _delegate(vault, _from, _to);
+  function getAccount(address vault, address _user) external view returns (TwabLib.Account memory) {
+    return userTwabs[vault][_user];
+  }
+
+  function getBalanceAt(
+    address _vault,
+    address _user,
+    uint32 _targetTime
+  ) external view returns (uint256) {
+    TwabLib.Account storage _account = userTwabs[_vault][_user];
+
+    return TwabLib.getBalanceAt(_account.twabs, _account.details, _targetTime);
+  }
+
+  function getTotalSupplyAt(address _vault, uint32 _targetTime) external view returns (uint256) {
+    TwabLib.Account storage _account = totalSupplyTwab[_vault];
+
+    return TwabLib.getBalanceAt(_account.twabs, _account.details, _targetTime);
+  }
+
+  function getAverageBalanceBetween(
+    address _vault,
+    address _user,
+    uint32 _startTime,
+    uint32 _endTime
+  ) external view returns (uint256) {
+    TwabLib.Account storage _account = userTwabs[_vault][_user];
+
+    return TwabLib.getAverageBalanceBetween(_account.twabs, _account.details, _startTime, _endTime);
+  }
+
+  function getAverageTotalSupplyBetween(
+    address _vault,
+    uint32 _startTime,
+    uint32 _endTime
+  ) external view returns (uint256) {
+    TwabLib.Account storage _account = totalSupplyTwab[_vault];
+
+    return TwabLib.getAverageBalanceBetween(_account.twabs, _account.details, _startTime, _endTime);
+  }
+
+  function getNewestTwab(
+    address _vault,
+    address _user
+  ) external view returns (uint16 index, ObservationLib.Observation memory twab) {
+    TwabLib.Account storage _account = userTwabs[_vault][_user];
+
+    return TwabLib.newestTwab(_account.twabs, _account.details);
+  }
+
+  function getOldestTwab(
+    address _vault,
+    address _user
+  ) external view returns (uint16 index, ObservationLib.Observation memory twab) {
+    TwabLib.Account storage _account = userTwabs[_vault][_user];
+
+    return TwabLib.oldestTwab(_account.twabs, _account.details);
+  }
+
+  /* ============ External Write Functions ============ */
+
+  // Updates the users (or delegates) delegateBalance
+  // Updates the users token balance
+  function twabMint(address _to, uint112 _amount) external {
+    _transferBalance(msg.sender, address(0), _to, _amount);
+  }
+
+  // Updates the users (or delegates) delegateBalance
+  // Updates the users token balance
+  function twabBurn(address _from, uint112 _amount) external {
+    _transferBalance(msg.sender, _from, address(0), _amount);
+  }
+
+  // Updates the users (or delegates) delegateBalance
+  // Updates the users token balance
+  function twabTransfer(address _from, address _to, uint112 _amount) external {
+    _transferBalance(msg.sender, _from, _to, _amount);
+  }
+
+  function delegate(address _vault, address _to) external {
+    _delegate(_vault, msg.sender, _to);
   }
 
   /* ============ Internal Functions ============ */
 
-  function _getAverageBalancesBetween(
-    TwabLib.Account storage _account,
-    uint64[] calldata _startTimes,
-    uint64[] calldata _endTimes
-  ) internal returns (uint256[] memory) {
-    uint256 startTimesLength = _startTimes.length;
-    require(startTimesLength == _endTimes.length, "Ticket/start-end-times-length-match");
-
-    TwabLib.AccountDetails memory accountDetails = _account.details;
-
-    uint256[] memory averageBalances = new uint256[](startTimesLength);
-    uint32 currentTimestamp = uint32(block.timestamp);
-
-    for (uint256 i = 0; i < startTimesLength; i++) {
-      averageBalances[i] = TwabLib.getAverageBalanceBetween(
-        _account.twabs,
-        accountDetails,
-        uint32(_startTimes[i]),
-        uint32(_endTimes[i]),
-        currentTimestamp
-      );
-    }
-
-    return averageBalances;
-  }
-
-  function _delegate(address vault, address _from, address _to) internal {
-    uint256 balance = userTwabs[vault][_from].details.balance;
-    address currentDelegate = delegates[vault][_from];
-
-    if (currentDelegate == _to) {
+  function _transferBalance(address _vault, address _from, address _to, uint112 _amount) internal {
+    if (_from == _to) {
       return;
     }
 
-    delegates[vault][_from] = _to;
-
-    _transferTwab(vault, currentDelegate, _to, balance);
-
-    emit Delegated(vault, _from, _to);
-  }
-
-  function _transferTwab(address vault, address _from, address _to, uint256 _amount) internal {
-    /// @param _amount The balance that is being transferred.
     // If we are transferring tokens from a delegated account to an undelegated account
     if (_from != address(0)) {
-      _decreaseUserTwab(vault, _from, _amount);
+      address _fromDelegate = _delegateOf(_vault, _from);
+      bool _isFromDelegate = _fromDelegate == _from;
+
+      _decreaseBalances(_vault, _from, _amount, _isFromDelegate ? _amount : 0);
+
+      if (!_isFromDelegate) {
+        _decreaseBalances(
+          _vault,
+          _fromDelegate,
+          0,
+          _fromDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+        );
+      }
 
       // burn
       if (_to == address(0)) {
-        _decreaseTotalSupplyTwab(vault, _amount);
+        _decreaseTotalSupplyBalances(
+          _vault,
+          _amount,
+          _fromDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+        );
       }
     }
 
     // If we are transferring tokens from an undelegated account to a delegated account
     if (_to != address(0)) {
-      _increaseUserTwab(vault, _to, _amount);
+      address _toDelegate = _delegateOf(_vault, _to);
+      bool _isToDelegate = _toDelegate == _to;
+
+      _increaseBalances(_vault, _to, _amount, _isToDelegate ? _amount : 0);
+
+      if (!_isToDelegate) {
+        _increaseBalances(_vault, _toDelegate, 0, _toDelegate != SPONSORSHIP_ADDRESS ? _amount : 0);
+      }
 
       // mint
       if (_from == address(0)) {
-        _increaseTotalSupplyTwab(vault, _amount);
+        _increaseTotalSupplyBalances(
+          _vault,
+          _amount,
+          _toDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+        );
       }
     }
   }
 
-  function _increaseUserTwab(address vault, address _to, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
+  function _delegateOf(address _vault, address _user) internal view returns (address) {
+    address _userDelegate;
+
+    if (_user != address(0)) {
+      _userDelegate = delegates[_vault][_user];
+
+      // If the user has not delegated, then the user is the delegate
+      if (_userDelegate == address(0)) {
+        _userDelegate = _user;
+      }
     }
 
-    TwabLib.Account storage _account = userTwabs[vault][_to];
+    return _userDelegate;
+  }
 
-    (
-      TwabLib.AccountDetails memory accountDetails,
-      ObservationLib.Observation memory twab,
-      bool isNew
-    ) = TwabLib.increaseBalance(_account, uint112(_amount), uint32(block.timestamp));
+  function _transferDelegateBalance(
+    address _vault,
+    address _fromDelegate,
+    address _toDelegate,
+    uint112 _amount
+  ) internal {
+    // If we are transferring tokens from a delegated account to an undelegated account
+    if (_fromDelegate != address(0)) {
+      _decreaseBalances(_vault, _fromDelegate, 0, _amount);
 
-    _account.details = accountDetails;
+      // burn
+      if (_toDelegate == address(0) || _toDelegate == SPONSORSHIP_ADDRESS) {
+        _decreaseTotalSupplyBalances(_vault, 0, _amount);
+      }
+    }
 
-    if (isNew) {
-      emit NewUserTwab(vault, _to, twab);
+    // If we are transferring tokens from an undelegated account to a delegated account
+    if (_toDelegate != address(0)) {
+      _increaseBalances(_vault, _toDelegate, 0, _amount);
+
+      // mint
+      if (_fromDelegate == address(0) || _fromDelegate == SPONSORSHIP_ADDRESS) {
+        _increaseTotalSupplyBalances(_vault, 0, _amount);
+      }
     }
   }
 
-  function _decreaseUserTwab(address vault, address _to, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
+  function _delegate(address _vault, address _from, address _toDelegate) internal {
+    address _currentDelegate = _delegateOf(_vault, _from);
+    require(_toDelegate != _currentDelegate, "TC/delegate-already-set");
 
-    TwabLib.Account storage _account = userTwabs[vault][_to];
+    delegates[_vault][_from] = _toDelegate;
+
+    _transferDelegateBalance(
+      _vault,
+      _currentDelegate,
+      _toDelegate,
+      userTwabs[_vault][_from].details.balance
+    );
+
+    emit Delegated(_vault, _from, _toDelegate);
+  }
+
+  function _increaseBalances(
+    address _vault,
+    address _user,
+    uint112 _amount,
+    uint112 _delegateAmount
+  ) internal {
+    TwabLib.Account storage _account = userTwabs[_vault][_user];
 
     (
-      TwabLib.AccountDetails memory accountDetails,
-      ObservationLib.Observation memory twab,
-      bool isNew
-    ) = TwabLib.decreaseBalance(
+      TwabLib.AccountDetails memory _accountDetails,
+      ObservationLib.Observation memory _twab,
+      bool _isNewTwab
+    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+
+    _account.details = _accountDetails;
+
+    if (_isNewTwab) {
+      emit NewUserTwab(_vault, _user, _twab);
+    }
+  }
+
+  function _decreaseBalances(
+    address _vault,
+    address _user,
+    uint112 _amount,
+    uint112 _delegateAmount
+  ) internal {
+    TwabLib.Account storage _account = userTwabs[_vault][_user];
+
+    (
+      TwabLib.AccountDetails memory _accountDetails,
+      ObservationLib.Observation memory _twab,
+      bool _isNewTwab
+    ) = TwabLib.decreaseBalances(
         _account,
-        uint112(_amount),
-        "Ticket/twab-burn-lt-balance",
-        uint32(block.timestamp)
+        _amount,
+        _delegateAmount,
+        "TC/twab-burn-lt-delegate-balance"
       );
 
-    _account.details = accountDetails;
+    _account.details = _accountDetails;
 
-    if (isNew) {
-      emit NewUserTwab(vault, _to, twab);
+    if (_isNewTwab) {
+      emit NewUserTwab(_vault, _user, _twab);
     }
   }
 
-  function _decreaseTotalSupplyTwab(address vault, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
+  function _decreaseTotalSupplyBalances(
+    address _vault,
+    uint112 _amount,
+    uint112 _delegateAmount
+  ) internal {
+    TwabLib.Account storage _account = totalSupplyTwab[_vault];
 
     (
-      TwabLib.AccountDetails memory accountDetails,
-      ObservationLib.Observation memory tsTwab,
-      bool tsIsNew
-    ) = TwabLib.decreaseBalance(
-        totalSupplyTwab[vault],
-        uint112(_amount),
-        "Ticket/burn-amount-exceeds-total-supply-twab",
-        uint32(block.timestamp)
+      TwabLib.AccountDetails memory _accountDetails,
+      ObservationLib.Observation memory _twab,
+      bool _tsIsNewTwab
+    ) = TwabLib.decreaseBalances(
+        _account,
+        _amount,
+        _delegateAmount,
+        "TC/burn-amount-exceeds-total-supply-balance"
       );
 
-    totalSupplyTwab[vault].details = accountDetails;
+    _account.details = _accountDetails;
 
-    if (tsIsNew) {
-      emit NewTotalSupplyTwab(vault, tsTwab);
+    if (_tsIsNewTwab) {
+      emit NewTotalSupplyTwab(_vault, _twab);
     }
   }
 
-  /// @notice Increases the total supply twab.  Should be called anytime a balance moves from undelegated to delegated
-  /// @param _amount The amount to increase the total by
-  function _increaseTotalSupplyTwab(address vault, uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
+  function _increaseTotalSupplyBalances(
+    address _vault,
+    uint112 _amount,
+    uint112 _delegateAmount
+  ) internal {
+    TwabLib.Account storage _account = totalSupplyTwab[_vault];
 
     (
-      TwabLib.AccountDetails memory accountDetails,
-      ObservationLib.Observation memory _totalSupply,
-      bool tsIsNew
-    ) = TwabLib.increaseBalance(totalSupplyTwab[vault], uint112(_amount), uint32(block.timestamp));
+      TwabLib.AccountDetails memory _accountDetails,
+      ObservationLib.Observation memory _twab,
+      bool _tsIsNewTwab
+    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
 
-    totalSupplyTwab[vault].details = accountDetails;
+    _account.details = _accountDetails;
 
-    if (tsIsNew) {
-      emit NewTotalSupplyTwab(vault, _totalSupply);
+    if (_tsIsNewTwab) {
+      emit NewTotalSupplyTwab(_vault, _twab);
     }
   }
 }
