@@ -229,7 +229,7 @@ contract TwabController {
     uint112 _amount
   ) internal {
     // If we are transferring tokens from a delegated account to an undelegated account
-    if (_fromDelegate != address(0)) {
+    if (_fromDelegate != address(0) && _fromDelegate != SPONSORSHIP_ADDRESS) {
       _decreaseBalances(_vault, _fromDelegate, 0, _amount);
 
       // burn
@@ -239,7 +239,7 @@ contract TwabController {
     }
 
     // If we are transferring tokens from an undelegated account to a delegated account
-    if (_toDelegate != address(0)) {
+    if (_toDelegate != address(0) && _toDelegate != SPONSORSHIP_ADDRESS) {
       _increaseBalances(_vault, _toDelegate, 0, _amount);
 
       // mint

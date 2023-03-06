@@ -30,7 +30,7 @@ contract TwabLibTest is BaseSetup {
   /* ============ increaseBalances ============ */
 
   function testIncreaseBalanceHappyPath() public {
-    uint112 _amount = 100;
+    uint112 _amount = 1000e18;
     uint32 _initialTimestamp = uint32(100);
     uint32 _currentTimestamp = uint32(200);
     vm.warp(_currentTimestamp);
@@ -55,7 +55,7 @@ contract TwabLibTest is BaseSetup {
   }
 
   function testIncreaseDelegateBalanceHappyPath() public {
-    uint112 _amount = 100;
+    uint112 _amount = 1000e18;
     uint32 _initialTimestamp = uint32(100);
     uint32 _currentTimestamp = uint32(200);
     vm.warp(_currentTimestamp);
@@ -79,8 +79,8 @@ contract TwabLibTest is BaseSetup {
   }
 
   function testIncreaseDelegateBalanceSameBlock() public {
-    uint112 _amount = 100;
-    uint112 _totalAmount = 200;
+    uint112 _amount = 1000e18;
+    uint112 _totalAmount = _amount * 2;
 
     uint32 _currentTimestamp = uint32(100);
     vm.warp(_currentTimestamp);
@@ -106,8 +106,8 @@ contract TwabLibTest is BaseSetup {
   }
 
   function testIncreaseDelegateBalanceMultipleRecords() public {
-    uint112 _amount = 100;
-    uint112 _totalAmount = 200;
+    uint112 _amount = 1000e18;
+    uint112 _totalAmount = _amount * 2;
 
     uint32 _initialTimestamp = uint32(100);
     uint32 _secondTimestamp = uint32(200);
@@ -138,7 +138,7 @@ contract TwabLibTest is BaseSetup {
     assertEq(_accountDetails.delegateBalance, _totalAmount);
     assertEq(_accountDetails.nextTwabIndex, 2);
     assertEq(_accountDetails.cardinality, 2);
-    assertEq(_twab.amount, _computeTwab(0, 100, 100));
+    assertEq(_twab.amount, _computeTwab(0, _amount, 100));
     assertEq(_twab.timestamp, 200);
     assertTrue(_isNewTwab);
 
@@ -148,7 +148,7 @@ contract TwabLibTest is BaseSetup {
   /* ============ decreaseBalances ============ */
 
   function testDecreaseBalanceHappyPath() public {
-    uint112 _amount = 100;
+    uint112 _amount = 1000e18;
 
     (
       TwabLib.AccountDetails memory _accountDetails,
@@ -169,7 +169,7 @@ contract TwabLibTest is BaseSetup {
   }
 
   function testDecreaseDelegateBalanceHappyPath() public {
-    uint112 _amount = 100;
+    uint112 _amount = 1000e18;
 
     uint32 _initialTimestamp = uint32(100);
     uint32 _secondTimestamp = uint32(200);
@@ -200,7 +200,7 @@ contract TwabLibTest is BaseSetup {
     assertEq(_accountDetails.delegateBalance, 0);
     assertEq(_accountDetails.nextTwabIndex, 2);
     assertEq(_accountDetails.cardinality, 2);
-    assertEq(_twab.amount, _computeTwab(0, 100, 100));
+    assertEq(_twab.amount, _computeTwab(0, _amount, 100));
     assertEq(_twab.timestamp, 200);
     assertTrue(_isNewTwab);
 
@@ -209,8 +209,8 @@ contract TwabLibTest is BaseSetup {
   }
 
   function testDecreaseDelegateBalanceMultipleRecords() public {
-    uint112 _amount = 100;
-    uint112 _halfAmount = 50;
+    uint112 _amount = 1000e18;
+    uint112 _halfAmount = _amount / 2;
 
     uint32 _initialTimestamp = uint32(100);
     uint32 _secondTimestamp = uint32(200);
@@ -243,7 +243,7 @@ contract TwabLibTest is BaseSetup {
     assertEq(_accountDetails.delegateBalance, _halfAmount);
     assertEq(_accountDetails.nextTwabIndex, 2);
     assertEq(_accountDetails.cardinality, 2);
-    assertEq(_twab.amount, _computeTwab(0, 100, 100));
+    assertEq(_twab.amount, _computeTwab(0, _amount, 100));
     assertEq(_twab.timestamp, _secondTimestamp);
     assertTrue(_isNewTwab);
 
@@ -258,7 +258,7 @@ contract TwabLibTest is BaseSetup {
     assertEq(_accountDetails.delegateBalance, 0);
     assertEq(_accountDetails.nextTwabIndex, 2);
     assertEq(_accountDetails.cardinality, 2);
-    assertEq(_twab.amount, _computeTwab(10000, 50, 200));
+    assertEq(_twab.amount, _computeTwab(100000e18, _halfAmount, 200));
     assertEq(_twab.timestamp, _thirdTimestamp);
     assertTrue(_isNewTwab);
   }
@@ -266,7 +266,7 @@ contract TwabLibTest is BaseSetup {
   /* ============ oldestTwab, newestTwab ============ */
 
   function testOldestAndNewestTwab() public {
-    uint112 _amount = 100;
+    uint112 _amount = 1000e18;
 
     uint32 _initialTimestamp = uint32(100);
     uint32 _secondTimestamp = uint32(200);
@@ -301,7 +301,7 @@ contract TwabLibTest is BaseSetup {
     assertEq(_oldestTwab.amount, 0);
     assertEq(_oldestTwab.timestamp, _initialTimestamp);
     assertEq(_newestIndex, 1);
-    assertEq(_newestTwab.amount, _computeTwab(10000, 200, 200));
+    assertEq(_newestTwab.amount, _computeTwab(100000e18, _amount * 2, 200));
     assertEq(_newestTwab.timestamp, _thirdTimestamp);
   }
 
@@ -315,7 +315,7 @@ contract TwabLibTest is BaseSetup {
     currentTimestamp = 2000;
 
     vm.warp(initialTimestamp);
-    twabLibMock.increaseBalances(0, 1000);
+    twabLibMock.increaseBalances(0, 1000e18);
   }
 
   function testgetAverageBalanceBetweenSingleBefore() public {
@@ -372,7 +372,7 @@ contract TwabLibTest is BaseSetup {
       _initialTimestamp + 50
     );
 
-    assertEq(_balance, 500);
+    assertEq(_balance, 500e18);
   }
 
   function testgetAverageBalanceBetweenSingleAfter() public {
@@ -387,7 +387,7 @@ contract TwabLibTest is BaseSetup {
       _initialTimestamp + 51
     );
 
-    assertEq(_balance, 1000);
+    assertEq(_balance, 1000e18);
   }
 
   function averageDelegateBalanceBetweenDoubleSetup()
@@ -399,10 +399,10 @@ contract TwabLibTest is BaseSetup {
     _currentTimestamp = uint32(3000);
 
     vm.warp(_initialTimestamp);
-    twabLibMock.increaseBalances(0, 1000);
+    twabLibMock.increaseBalances(0, 1000e18);
 
     vm.warp(_secondTimestamp);
-    twabLibMock.decreaseBalances(0, 500, "insufficient-balance");
+    twabLibMock.decreaseBalances(0, 500e18, "insufficient-balance");
   }
 
   function testAverageDelegateBalanceBetweenDoubleTwabBefore() public {
@@ -434,7 +434,7 @@ contract TwabLibTest is BaseSetup {
       _initialTimestamp + 50
     );
 
-    assertEq(_balance, 500);
+    assertEq(_balance, 500e18);
   }
 
   function testAverageDelegateBalanceBetwenDoubleOldestIsFirst() public {
@@ -450,7 +450,7 @@ contract TwabLibTest is BaseSetup {
       _initialTimestamp + 50
     );
 
-    assertEq(_balance, 1000);
+    assertEq(_balance, 1000e18);
   }
 
   function testAverageDelegateBalanceBetweenDoubleBetween() public {
@@ -466,7 +466,7 @@ contract TwabLibTest is BaseSetup {
       _secondTimestamp - 50
     );
 
-    assertEq(_balance, 1000);
+    assertEq(_balance, 1000e18);
   }
 
   function testAverageDelegateBalanceBettwenDoubleCenteredSecond() public {
@@ -482,7 +482,7 @@ contract TwabLibTest is BaseSetup {
       _secondTimestamp + 50
     );
 
-    assertEq(_balance, 750);
+    assertEq(_balance, 750e18);
   }
 
   function testAverageDelegateBalanceBetweenDoubleAfter() public {
@@ -498,7 +498,7 @@ contract TwabLibTest is BaseSetup {
       _secondTimestamp + 51
     );
 
-    assertEq(_balance, 500);
+    assertEq(_balance, 500e18);
   }
 
   /* ============ getBalanceAt ============ */
@@ -508,7 +508,7 @@ contract TwabLibTest is BaseSetup {
     _currentTimestamp = 2000;
 
     vm.warp(_initialTimestamp);
-    twabLibMock.increaseBalances(0, 1000);
+    twabLibMock.increaseBalances(0, 1000e18);
   }
 
   function testDelegateBalanceAtSingleTwabBefore() public {
@@ -534,7 +534,7 @@ contract TwabLibTest is BaseSetup {
   // }
 
   function testProblematicQuery() public {
-    uint112 _amount = 100;
+    uint112 _amount = 1000e18;
 
     vm.warp(1630713395);
     twabLibMock.increaseBalances(0, _amount);
@@ -545,7 +545,7 @@ contract TwabLibTest is BaseSetup {
     vm.warp(1675702148);
     uint256 _balance = twabLibMock.getBalanceAt(1630713395);
 
-    assertEq(_balance, 100);
+    assertEq(_balance, _amount);
   }
 
   /* ============ Cardinality ============ */
@@ -554,12 +554,13 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails({ balance: 0, delegateBalance: 0, nextTwabIndex: 2, cardinality: 10 })
     );
 
-    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(0, 100);
+    uint112 _amount = 1000e18;
+    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(0, _amount);
 
     assertEq(accountDetails.nextTwabIndex, 3);
     assertEq(accountDetails.cardinality, 11);
     assertEq(accountDetails.balance, 0);
-    assertEq(accountDetails.delegateBalance, 100);
+    assertEq(accountDetails.delegateBalance, _amount);
   }
 
   function testIncreaseCardinalityOverflow() public {
@@ -572,11 +573,12 @@ contract TwabLibTest is BaseSetup {
       })
     );
 
-    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(0, 100);
+    uint112 _amount = 1000e18;
+    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(0, _amount);
 
     assertEq(accountDetails.nextTwabIndex, 3);
     assertEq(accountDetails.cardinality, 2 ** 16 - 1);
     assertEq(accountDetails.balance, 0);
-    assertEq(accountDetails.delegateBalance, 100);
+    assertEq(accountDetails.delegateBalance, _amount);
   }
 }

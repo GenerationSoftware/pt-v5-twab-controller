@@ -46,19 +46,30 @@ contract TwabLibMock {
     account.details = accountDetails;
   }
 
-  function getAverageBalanceBetween(uint32 _startTime, uint32 _endTime) external returns (uint256) {
+  function getAverageBalanceBetween(
+    uint32 _startTime,
+    uint32 _endTime
+  ) external view returns (uint256) {
     return TwabLib.getAverageBalanceBetween(account.twabs, account.details, _startTime, _endTime);
   }
 
-  function oldestTwab() external returns (uint16 index, ObservationLib.Observation memory twab) {
+  function oldestTwab()
+    external
+    view
+    returns (uint16 index, ObservationLib.Observation memory twab)
+  {
     (index, twab) = TwabLib.oldestTwab(account.twabs, account.details);
   }
 
-  function newestTwab() external returns (uint16 index, ObservationLib.Observation memory twab) {
+  function newestTwab()
+    external
+    view
+    returns (uint16 index, ObservationLib.Observation memory twab)
+  {
     (index, twab) = TwabLib.newestTwab(account.twabs, account.details);
   }
 
-  function getBalanceAt(uint32 _targetTime) external returns (uint256 balance) {
+  function getBalanceAt(uint32 _targetTime) external view returns (uint256 balance) {
     balance = TwabLib.getBalanceAt(account.twabs, account.details, _targetTime);
   }
 
