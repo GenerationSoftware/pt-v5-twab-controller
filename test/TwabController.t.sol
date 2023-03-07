@@ -262,20 +262,19 @@ contract TwabControllerTest is BaseSetup {
     assertEq(twabController.totalSupply(mockVault), _amount);
     assertEq(twabController.totalSupplyDelegateBalance(mockVault), _amount);
 
-    changePrank(alice);
-
-    address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
-    twabController.delegate(mockVault, _sponsorshipAddress);
+    twabController.sponsor(alice);
 
     assertEq(twabController.balanceOf(mockVault, alice), _amount);
     assertEq(twabController.delegateBalanceOf(mockVault, alice), 0);
 
+    address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
     assertEq(twabController.balanceOf(mockVault, _sponsorshipAddress), 0);
     assertEq(twabController.delegateBalanceOf(mockVault, _sponsorshipAddress), 0);
 
     assertEq(twabController.totalSupply(mockVault), _amount);
     assertEq(twabController.totalSupplyDelegateBalance(mockVault), 0);
 
+    changePrank(alice);
     twabController.delegate(mockVault, bob);
 
     assertEq(twabController.balanceOf(mockVault, alice), _amount);
@@ -425,12 +424,10 @@ contract TwabControllerTest is BaseSetup {
 
     assertEq(twabController.delegateOf(mockVault, alice), alice);
 
-    vm.startPrank(alice);
-    twabController.delegate(mockVault, _sponsorshipAddress);
+    vm.startPrank(mockVault);
+    twabController.sponsor(alice);
 
     assertEq(twabController.delegateOf(mockVault, alice), _sponsorshipAddress);
-
-    changePrank(mockVault);
 
     uint112 _amount = 1000e18;
     twabController.twabMint(alice, _amount);
