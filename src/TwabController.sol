@@ -152,6 +152,15 @@ contract TwabController {
     _delegate(_vault, msg.sender, _to);
   }
 
+  /**
+   * @notice Delegate user balance to the sponsorship address.
+   * @dev Must only be called by the Vault contract.
+   * @param _from Address of the user delegating their balance to the sponsorship address.
+   */
+  function sponsor(address _from) external {
+    _delegate(msg.sender, _from, SPONSORSHIP_ADDRESS);
+  }
+
   /* ============ Internal Functions ============ */
 
   function _transferBalance(address _vault, address _from, address _to, uint112 _amount) internal {
