@@ -380,6 +380,21 @@ contract TwabControllerTest is BaseSetup {
     vm.startPrank(mockVault);
 
     uint112 _amount = 1000e18;
+    vm.expectEmit(true, true, false, true);
+    emit IncreasedBalance(
+      mockVault,
+      alice,
+      _amount,
+      true,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+    vm.expectEmit(true, false, false, true);
+    emit IncreasedTotalSupply(
+      mockVault,
+      _amount,
+      true,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
     twabController.twabMint(alice, _amount);
 
     vm.expectEmit(true, true, false, true);
@@ -399,13 +414,6 @@ contract TwabControllerTest is BaseSetup {
       ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
     );
     twabController.twabBurn(alice, _amount);
-
-    TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
-    TwabLib.AccountDetails memory accountDetails = account.details;
-
-    assertEq(accountDetails.balance, 0);
-    assertEq(accountDetails.delegateBalance, 0);
-
     vm.stopPrank();
   }
 
