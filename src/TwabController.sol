@@ -37,15 +37,38 @@ contract TwabController {
 
   /* ============ Events ============ */
 
-  event NewUserTwab(
+  event IncreasedBalance(
     address indexed vault,
     address indexed user,
-    ObservationLib.Observation newTwab
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
+  event DecreasedBalance(
+    address indexed vault,
+    address indexed user,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
   );
 
   event Delegated(address indexed vault, address indexed delegator, address indexed delegate);
 
-  event NewTotalSupplyTwab(address indexed vault, ObservationLib.Observation newTotalSupplyTwab);
+  event IncreasedTotalSupply(
+    address indexed vault,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
+  event DecreasedTotalSupply(
+    address indexed vault,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
 
   /* ============ External Read Functions ============ */
 
@@ -290,9 +313,7 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    if (_isNewTwab) {
-      emit NewUserTwab(_vault, _user, _twab);
-    }
+    emit IncreasedBalance(_vault, _user, _amount, _isNewTwab, _twab);
   }
 
   function _decreaseBalances(
@@ -316,9 +337,7 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    if (_isNewTwab) {
-      emit NewUserTwab(_vault, _user, _twab);
-    }
+    emit DecreasedBalance(_vault, _user, _amount, _isNewTwab, _twab);
   }
 
   function _decreaseTotalSupplyBalances(
@@ -331,7 +350,7 @@ contract TwabController {
     (
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
-      bool _tsIsNewTwab
+      bool _isNewTwab
     ) = TwabLib.decreaseBalances(
         _account,
         _amount,
@@ -341,9 +360,7 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    if (_tsIsNewTwab) {
-      emit NewTotalSupplyTwab(_vault, _twab);
-    }
+    emit DecreasedTotalSupply(_vault, _amount, _isNewTwab, _twab);
   }
 
   function _increaseTotalSupplyBalances(
@@ -356,13 +373,11 @@ contract TwabController {
     (
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
-      bool _tsIsNewTwab
+      bool _isNewTwab
     ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
 
     _account.details = _accountDetails;
 
-    if (_tsIsNewTwab) {
-      emit NewTotalSupplyTwab(_vault, _twab);
-    }
+    emit IncreasedTotalSupply(_vault, _amount, _isNewTwab, _twab);
   }
 }

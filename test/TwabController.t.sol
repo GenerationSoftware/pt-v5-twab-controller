@@ -15,15 +15,37 @@ contract TwabControllerTest is BaseSetup {
   ERC20 public token;
   uint16 public constant MAX_CARDINALITY = 365;
 
-  event NewUserTwab(
+  event IncreasedBalance(
     address indexed vault,
-    address indexed delegate,
-    ObservationLib.Observation newTwab
+    address indexed user,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
+  event DecreasedBalance(
+    address indexed vault,
+    address indexed user,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
   );
 
   event Delegated(address indexed vault, address indexed delegator, address indexed delegate);
 
-  event NewTotalSupplyTwab(address indexed vault, ObservationLib.Observation newTotalSupplyTwab);
+  event IncreasedTotalSupply(
+    address indexed vault,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
+  event DecreasedTotalSupply(
+    address indexed vault,
+    uint112 amount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
 
   function setUp() public override {
     super.setUp();
@@ -290,22 +312,26 @@ contract TwabControllerTest is BaseSetup {
   }
 
   function testMint() external {
+    uint112 _amount = 1000e18;
     vm.expectEmit(true, true, false, true);
-    emit NewUserTwab(
+    emit IncreasedBalance(
       mockVault,
       alice,
+      _amount,
+      true,
       ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
     );
 
     vm.expectEmit(true, false, false, true);
-    emit NewTotalSupplyTwab(
+    emit IncreasedTotalSupply(
       mockVault,
+      _amount,
+      true,
       ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
     );
 
     vm.startPrank(mockVault);
 
-    uint112 _amount = 1000e18;
     twabController.twabMint(alice, _amount);
 
     TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
@@ -322,6 +348,56 @@ contract TwabControllerTest is BaseSetup {
 
     uint112 _amount = 1000e18;
     twabController.twabMint(alice, _amount);
+
+    vm.expectEmit(true, true, false, true);
+    emit DecreasedBalance(
+      mockVault,
+      alice,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+
+    vm.expectEmit(true, false, false, true);
+    emit DecreasedTotalSupply(
+      mockVault,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+    twabController.twabBurn(alice, _amount);
+
+    TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
+    TwabLib.AccountDetails memory accountDetails = account.details;
+
+    assertEq(accountDetails.balance, 0);
+    assertEq(accountDetails.delegateBalance, 0);
+
+    vm.stopPrank();
+  }
+
+  function testIsNewEvent() external {
+    vm.startPrank(mockVault);
+
+    uint112 _amount = 1000e18;
+    twabController.twabMint(alice, _amount);
+
+    vm.expectEmit(true, true, false, true);
+    emit DecreasedBalance(
+      mockVault,
+      alice,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+
+    vm.expectEmit(true, false, false, true);
+    emit DecreasedTotalSupply(
+      mockVault,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
     twabController.twabBurn(alice, _amount);
 
     TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
