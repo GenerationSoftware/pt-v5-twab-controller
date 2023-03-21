@@ -451,6 +451,42 @@ contract TwabControllerTest is BaseSetup {
   }
 
   /* ============ TWAB ============ */
+
+  // TODO: Currently this test passes. It should fail/be handled differently.
+  // 2 updates to an uninitialized twab within 24h results in 2 separate TWAB observations.
+  // We want the TWAB hsitory to be a single observation per 24h period.
+  function testFailTwabInitialTwoInOneDay() external {
+    deal({ token: address(token), to: alice, give: 10000e18 });
+
+    uint256 t0 = 1 days;
+    uint256 t1 = t0 + 12 hours;
+
+    vm.warp(t0);
+
+    vm.startPrank(mockVault);
+
+    uint112 _amount = 1000e18;
+    twabController.twabMint(alice, _amount);
+
+    vm.warp(t1);
+    twabController.twabMint(alice, _amount);
+
+    TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
+    TwabLib.AccountDetails memory accountDetails = account.details;
+
+    assertEq(accountDetails.balance, _amount * 2);
+    assertEq(accountDetails.delegateBalance, _amount * 2);
+
+    (uint16 index, ObservationLib.Observation memory twab) = twabController.getNewestTwab(
+      mockVault,
+      alice
+    );
+
+    assertEq(twab.amount, 43200000e18);
+    assertEq(twab.timestamp, t1);
+    assertEq(index, 1);
+  }
+
   function testTwabSuccessive() external {
     deal({ token: address(token), to: alice, give: 10000e18 });
 
