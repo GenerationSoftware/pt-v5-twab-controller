@@ -4,10 +4,10 @@ pragma solidity 0.8.17;
 import "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 
-import { TwabController } from "../src/TwabController.sol";
-import { TwabLib } from "../src/libraries/TwabLib.sol";
-import { ObservationLib } from "../src/libraries/ObservationLib.sol";
-import { BaseSetup } from "./utils/BaseSetup.sol";
+import { TwabController } from "src/TwabController.sol";
+import { TwabLib } from "src/libraries/TwabLib.sol";
+import { ObservationLib } from "src/libraries/ObservationLib.sol";
+import { BaseSetup } from "test/utils/BaseSetup.sol";
 
 contract TwabControllerTest is BaseSetup {
   TwabController public twabController;
@@ -15,15 +15,41 @@ contract TwabControllerTest is BaseSetup {
   ERC20 public token;
   uint16 public constant MAX_CARDINALITY = 365;
 
-  event NewUserTwab(
+  event IncreasedBalance(
     address indexed vault,
-    address indexed delegate,
-    ObservationLib.Observation newTwab
+    address indexed user,
+    uint112 amount,
+    uint112 delegateAmount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
+  event DecreasedBalance(
+    address indexed vault,
+    address indexed user,
+    uint112 amount,
+    uint112 delegateAmount,
+    bool isNew,
+    ObservationLib.Observation twab
   );
 
   event Delegated(address indexed vault, address indexed delegator, address indexed delegate);
 
-  event NewTotalSupplyTwab(address indexed vault, ObservationLib.Observation newTotalSupplyTwab);
+  event IncreasedTotalSupply(
+    address indexed vault,
+    uint112 amount,
+    uint112 delegateAmount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
+
+  event DecreasedTotalSupply(
+    address indexed vault,
+    uint112 amount,
+    uint112 delegateAmount,
+    bool isNew,
+    ObservationLib.Observation twab
+  );
 
   function setUp() public override {
     super.setUp();
@@ -290,22 +316,28 @@ contract TwabControllerTest is BaseSetup {
   }
 
   function testMint() external {
+    uint112 _amount = 1000e18;
     vm.expectEmit(true, true, false, true);
-    emit NewUserTwab(
+    emit IncreasedBalance(
       mockVault,
       alice,
+      _amount,
+      _amount,
+      true,
       ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
     );
 
     vm.expectEmit(true, false, false, true);
-    emit NewTotalSupplyTwab(
+    emit IncreasedTotalSupply(
       mockVault,
+      _amount,
+      _amount,
+      true,
       ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
     );
 
     vm.startPrank(mockVault);
 
-    uint112 _amount = 1000e18;
     twabController.twabMint(alice, _amount);
 
     TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
@@ -322,6 +354,25 @@ contract TwabControllerTest is BaseSetup {
 
     uint112 _amount = 1000e18;
     twabController.twabMint(alice, _amount);
+
+    vm.expectEmit(true, true, false, true);
+    emit DecreasedBalance(
+      mockVault,
+      alice,
+      _amount,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+
+    vm.expectEmit(true, false, false, true);
+    emit DecreasedTotalSupply(
+      mockVault,
+      _amount,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
     twabController.twabBurn(alice, _amount);
 
     TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
@@ -330,6 +381,51 @@ contract TwabControllerTest is BaseSetup {
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, 0);
 
+    vm.stopPrank();
+  }
+
+  function testIsNewEvent() external {
+    vm.startPrank(mockVault);
+
+    uint112 _amount = 1000e18;
+    vm.expectEmit(true, true, false, true);
+    emit IncreasedBalance(
+      mockVault,
+      alice,
+      _amount,
+      _amount,
+      true,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+    vm.expectEmit(true, false, false, true);
+    emit IncreasedTotalSupply(
+      mockVault,
+      _amount,
+      _amount,
+      true,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+    twabController.twabMint(alice, _amount);
+
+    vm.expectEmit(true, true, false, true);
+    emit DecreasedBalance(
+      mockVault,
+      alice,
+      _amount,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+
+    vm.expectEmit(true, false, false, true);
+    emit DecreasedTotalSupply(
+      mockVault,
+      _amount,
+      _amount,
+      false,
+      ObservationLib.Observation({ amount: 0, timestamp: uint32(block.timestamp) })
+    );
+    twabController.twabBurn(alice, _amount);
     vm.stopPrank();
   }
 
@@ -455,7 +551,7 @@ contract TwabControllerTest is BaseSetup {
   // TODO: Currently this test passes. It should fail/be handled differently.
   // 2 updates to an uninitialized twab within 24h results in 2 separate TWAB observations.
   // We want the TWAB hsitory to be a single observation per 24h period.
-  function testFailTwabInitialTwoInOneDay() external {
+  function testTwabInitialTwoInOneDay() external {
     deal({ token: address(token), to: alice, give: 10000e18 });
 
     uint256 t0 = 1 days;

@@ -3,9 +3,9 @@
 pragma solidity 0.8.17;
 
 import "openzeppelin/utils/math/SafeCast.sol";
+import "ring-buffer-lib/RingBufferLib.sol";
 
 import "./OverflowSafeComparatorLib.sol";
-import "./RingBufferLib.sol";
 
 /**
  * @dev Sets max ring buffer length in the Account.twabs Observation list.

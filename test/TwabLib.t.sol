@@ -3,10 +3,10 @@ pragma solidity 0.8.17;
 
 import "forge-std/Test.sol";
 
-import { BaseSetup } from "./utils/BaseSetup.sol";
+import { BaseSetup } from "test/utils/BaseSetup.sol";
 import { TwabLib } from "src/libraries/TwabLib.sol";
 import { TwabLibMock } from "test/contracts/mocks/TwabLibMock.sol";
-import { ObservationLib } from "../src/libraries/ObservationLib.sol";
+import { ObservationLib } from "src/libraries/ObservationLib.sol";
 
 contract TwabLibTest is BaseSetup {
   TwabLibMock public twabLibMock;
@@ -206,6 +206,46 @@ contract TwabLibTest is BaseSetup {
 
     assertEq(twabLibMock.getBalanceAt(_initialTimestamp), _amount);
     assertEq(twabLibMock.getBalanceAt(_secondTimestamp), 0);
+  }
+
+  function testDecreaseDelegateBalanceRevert() public {
+    uint112 _amount = 1000e18;
+
+    uint32 _initialTimestamp = uint32(100);
+    uint32 _secondTimestamp = uint32(200);
+
+    vm.warp(_initialTimestamp);
+    (
+      TwabLib.AccountDetails memory _accountDetails,
+      ObservationLib.Observation memory _twab,
+      bool _isNewTwab
+    ) = twabLibMock.increaseBalances(0, _amount);
+
+    assertEq(_accountDetails.balance, 0);
+    assertEq(_accountDetails.delegateBalance, _amount);
+    assertEq(_accountDetails.nextTwabIndex, 1);
+    assertEq(_accountDetails.cardinality, 1);
+    assertEq(_twab.amount, 0);
+    assertEq(_twab.timestamp, 100);
+    assertTrue(_isNewTwab);
+
+    vm.warp(_secondTimestamp);
+
+    // Decrease more than current balance available
+    vm.expectRevert(bytes("Revert message"));
+    (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
+      _amount + 1,
+      0,
+      "Revert message"
+    );
+
+    // Decrease more than current delegateBalance available
+    vm.expectRevert(bytes("Revert message"));
+    (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
+      0,
+      _amount + 1,
+      "Revert message"
+    );
   }
 
   function testDecreaseDelegateBalanceMultipleRecords() public {
@@ -501,6 +541,22 @@ contract TwabLibTest is BaseSetup {
     assertEq(_balance, 500e18);
   }
 
+  function testAverageDelegateBalanceTargetOldest() public {
+    (
+      ,
+      uint32 _secondTimestamp,
+      uint32 _currentTimestamp
+    ) = averageDelegateBalanceBetweenDoubleSetup();
+
+    vm.warp(_currentTimestamp);
+    uint256 _balance = twabLibMock.getAverageBalanceBetween(
+      _secondTimestamp - 10,
+      _secondTimestamp
+    );
+
+    assertEq(_balance, 1000e18);
+  }
+
   /* ============ getBalanceAt ============ */
 
   function getBalanceAtSetup() public returns (uint32 _initialTimestamp, uint32 _currentTimestamp) {
@@ -520,18 +576,14 @@ contract TwabLibTest is BaseSetup {
     assertEq(_balance, 0);
   }
 
-  // function testDelegateBalanceAtSingleTwabAtOrAfter() public {
-  //   (uint32 _initialTimestamp, uint32 _currentTimestamp) = getBalanceAtSetup();
+  function testDelegateBalanceAtPreInitialTimestamp() public {
+    (uint32 _initialTimestamp, uint32 _currentTimestamp) = getBalanceAtSetup();
 
-  //   vm.warp(_currentTimestamp);
-  //   uint256 _balance = twabLibMock.getBalanceAt(
-  //     account.twabs,
-  //     account.details,
-  //     _initialTimestamp
-  //   );
+    vm.warp(_currentTimestamp);
+    uint256 _balance = twabLibMock.getBalanceAt(_initialTimestamp - 1);
 
-  //   assertEq(_balance, 1000);
-  // }
+    assertEq(_balance, 0);
+  }
 
   function testProblematicQuery() public {
     uint112 _amount = 1000e18;
