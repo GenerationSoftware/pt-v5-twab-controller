@@ -13,64 +13,62 @@ contract TwabLibMock {
   function increaseBalances(
     uint112 _amount,
     uint112 _delegateAmount
-  )
-    external
-    returns (
+  ) external returns (TwabLib.AccountDetails memory, ObservationLib.Observation memory, bool) {
+    (
       TwabLib.AccountDetails memory accountDetails,
       ObservationLib.Observation memory twab,
       bool isNewTwab
-    )
-  {
-    (accountDetails, twab, isNewTwab) = TwabLib.increaseBalances(account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(account, _amount, _delegateAmount);
     account.details = accountDetails;
+    return (accountDetails, twab, isNewTwab);
   }
 
   function decreaseBalances(
     uint112 _amount,
     uint112 _delegateAmount,
     string memory _revertMessage
-  )
-    external
-    returns (
+  ) external returns (TwabLib.AccountDetails memory, ObservationLib.Observation memory, bool) {
+    (
       TwabLib.AccountDetails memory accountDetails,
       ObservationLib.Observation memory twab,
       bool isNewTwab
-    )
-  {
-    (accountDetails, twab, isNewTwab) = TwabLib.decreaseBalances(
-      account,
-      _amount,
-      _delegateAmount,
-      _revertMessage
-    );
+    ) = TwabLib.decreaseBalances(account, _amount, _delegateAmount, _revertMessage);
     account.details = accountDetails;
+    return (accountDetails, twab, isNewTwab);
   }
 
   function getAverageBalanceBetween(
     uint32 _startTime,
     uint32 _endTime
   ) external view returns (uint256) {
-    return TwabLib.getAverageBalanceBetween(account.twabs, account.details, _startTime, _endTime);
+    uint256 averageBalance = TwabLib.getAverageBalanceBetween(
+      account.twabs,
+      account.details,
+      _startTime,
+      _endTime
+    );
+    return averageBalance;
   }
 
-  function oldestTwab()
-    external
-    view
-    returns (uint16 index, ObservationLib.Observation memory twab)
-  {
-    (index, twab) = TwabLib.oldestTwab(account.twabs, account.details);
+  function oldestTwab() external view returns (uint16, ObservationLib.Observation memory) {
+    (uint16 index, ObservationLib.Observation memory twab) = TwabLib.oldestTwab(
+      account.twabs,
+      account.details
+    );
+    return (index, twab);
   }
 
-  function newestTwab()
-    external
-    view
-    returns (uint16 index, ObservationLib.Observation memory twab)
-  {
-    (index, twab) = TwabLib.newestTwab(account.twabs, account.details);
+  function newestTwab() external view returns (uint16, ObservationLib.Observation memory) {
+    (uint16 index, ObservationLib.Observation memory twab) = TwabLib.newestTwab(
+      account.twabs,
+      account.details
+    );
+    return (index, twab);
   }
 
-  function getBalanceAt(uint32 _targetTime) external view returns (uint256 balance) {
-    balance = TwabLib.getBalanceAt(account.twabs, account.details, _targetTime);
+  function getBalanceAt(uint32 _targetTime) external view returns (uint256) {
+    uint256 balance = TwabLib.getBalanceAt(account.twabs, account.details, _targetTime);
+    return balance;
   }
 
   function setAccountDetails(TwabLib.AccountDetails calldata _accountDetails) external {

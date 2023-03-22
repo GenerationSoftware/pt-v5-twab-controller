@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
+import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
+
 import { TwabLib } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";
 import { ExtendedSafeCastLib } from "./libraries/ExtendedSafeCastLib.sol";
-import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 
 /**
  * @title  PoolTogether V5 TwabController
@@ -41,6 +42,7 @@ contract TwabController {
     address indexed vault,
     address indexed user,
     uint112 amount,
+    uint112 delegateAmount,
     bool isNew,
     ObservationLib.Observation twab
   );
@@ -49,6 +51,7 @@ contract TwabController {
     address indexed vault,
     address indexed user,
     uint112 amount,
+    uint112 delegateAmount,
     bool isNew,
     ObservationLib.Observation twab
   );
@@ -58,6 +61,7 @@ contract TwabController {
   event IncreasedTotalSupply(
     address indexed vault,
     uint112 amount,
+    uint112 delegateAmount,
     bool isNew,
     ObservationLib.Observation twab
   );
@@ -65,10 +69,10 @@ contract TwabController {
   event DecreasedTotalSupply(
     address indexed vault,
     uint112 amount,
+    uint112 delegateAmount,
     bool isNew,
     ObservationLib.Observation twab
   );
-
 
   /* ============ External Read Functions ============ */
 
@@ -313,7 +317,7 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    emit IncreasedBalance(_vault, _user, _amount, _isNewTwab, _twab);
+    emit IncreasedBalance(_vault, _user, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 
   function _decreaseBalances(
@@ -337,7 +341,7 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    emit DecreasedBalance(_vault, _user, _amount, _isNewTwab, _twab);
+    emit DecreasedBalance(_vault, _user, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 
   function _decreaseTotalSupplyBalances(
@@ -360,7 +364,7 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    emit DecreasedTotalSupply(_vault, _amount, _isNewTwab, _twab);
+    emit DecreasedTotalSupply(_vault, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 
   function _increaseTotalSupplyBalances(
@@ -378,6 +382,6 @@ contract TwabController {
 
     _account.details = _accountDetails;
 
-    emit IncreasedTotalSupply(_vault, _amount, _isNewTwab, _twab);
+    emit IncreasedTotalSupply(_vault, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 }
