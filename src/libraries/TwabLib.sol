@@ -309,7 +309,7 @@ library TwabLib {
       return ObservationLib.Observation({ amount: 0, timestamp: _targetTimestamp });
     }
 
-    // Otherwise, both timestamps must be surrounded by twabs.
+    // Otherwise, timestamp must be surrounded by TWAB Observations
     (
       ObservationLib.Observation memory beforeOrAtStart,
       ObservationLib.Observation memory afterOrAtStart
@@ -337,7 +337,7 @@ library TwabLib {
 
   /**
    * @notice Calculates the next TWAB using the newestTwab and updated balance.
-   * @dev    Storage of the TWAB obersation is managed by the calling function and not _computeNextTwab.
+   * @dev    Storage of the TWAB obersation is managed by the calling function increaseBalances or decreaseBalances and not _computeNextTwab.
    * @param _currentTwab    Newest Observation in the Account.twabs list
    * @param _currentDelegateBalance User delegateBalance at time of most recent (newest) checkpoint write
    * @param _time           Current block.timestamp
@@ -359,8 +359,10 @@ library TwabLib {
   }
 
   /**
-   * @notice Sets a new TWAB Observation at the next available index and returns the new account.
+   * @notice Sets a new TWAB Observation at the next available index or overwrites and returns the new
+   *         account.
    * @dev Note that if `_currentTime` is before the last observation timestamp, it appears as an overflow.
+   * @dev Mutates the `_twabs` array.
    * @param _twabs The twabs array to insert into
    * @param _accountDetails The current accountDetails
    * @return accountDetails The new account details
@@ -400,12 +402,6 @@ library TwabLib {
       _currentTime
     );
 
-    /**
-     * TODO
-     * secondNewestTwab.timestamp will always return 0 if it has not be overwritten yet.
-     * So it means that this condition will return true for the second time the twab is updated
-     * even if less than 24 hours elapsed between the first recording.
-     */
     if (
       secondNewestTwab.timestamp == 0 ||
       (OverflowSafeComparatorLib.checkedSub(

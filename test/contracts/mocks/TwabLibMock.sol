@@ -74,4 +74,8 @@ contract TwabLibMock {
   function setAccountDetails(TwabLib.AccountDetails calldata _accountDetails) external {
     account.details = _accountDetails;
   }
+
+  function getAccount() external view returns (TwabLib.Account memory) {
+    return account;
+  }
 }

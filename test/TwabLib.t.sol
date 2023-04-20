@@ -430,6 +430,27 @@ contract TwabLibTest is BaseSetup {
     assertEq(_balance, 1000e18);
   }
 
+  function testGetAverageBalanceBetween_LargeOverwrite() external {
+    uint32 drawStart = 4 days;
+    uint32 drawEnd = 5 days;
+    uint112 amount = 1e18;
+    uint112 largeAmount = 1000000e18;
+
+    vm.warp(uint32(drawStart - 2 days));
+    twabLibMock.increaseBalances(amount, amount);
+    vm.warp(uint32(drawStart - 2 days + 12 hours));
+    twabLibMock.decreaseBalances(amount, amount, "Revert");
+    vm.warp(uint32(drawStart - 1 seconds));
+    twabLibMock.increaseBalances(largeAmount, largeAmount);
+    vm.warp(uint32(drawStart + 1 seconds));
+    twabLibMock.decreaseBalances(largeAmount, largeAmount, "Revert");
+    vm.warp(uint32(drawEnd + 1 days - 1 seconds));
+    twabLibMock.increaseBalances(largeAmount, largeAmount);
+
+    uint256 averageBalance = twabLibMock.getAverageBalanceBetween(drawStart, drawEnd);
+    assertEq(averageBalance, 11574074074074074074);
+  }
+
   function averageDelegateBalanceBetweenDoubleSetup()
     public
     returns (uint32 _initialTimestamp, uint32 _secondTimestamp, uint32 _currentTimestamp)
