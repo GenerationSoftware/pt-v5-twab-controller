@@ -11,6 +11,7 @@ import { ObservationLib } from "src/libraries/ObservationLib.sol";
 contract TwabLibTest is BaseSetup {
   TwabLibMock public twabLibMock;
   uint16 public MAX_CARDINALITY = 365;
+  uint32 overwritePeriod = 1 days;
 
   function _computeTwab(
     uint256 _currentTwabAmount,
@@ -39,7 +40,7 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(_amount, 0);
+    ) = twabLibMock.increaseBalances(_amount, 0, overwritePeriod);
 
     assertEq(_accountDetails.balance, _amount);
     assertEq(_accountDetails.delegateBalance, 0);
@@ -64,7 +65,7 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(0, _amount);
+    ) = twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     assertEq(_accountDetails.balance, 0);
     assertEq(_accountDetails.delegateBalance, _amount);
@@ -86,13 +87,13 @@ contract TwabLibTest is BaseSetup {
     vm.warp(_currentTimestamp);
 
     // Increase delegateBalance twice
-    twabLibMock.increaseBalances(0, _amount);
+    twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     (
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(0, _amount);
+    ) = twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     assertEq(_accountDetails.balance, 0);
     assertEq(_accountDetails.delegateBalance, _totalAmount);
@@ -117,7 +118,7 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(0, _amount);
+    ) = twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     assertEq(_accountDetails.balance, 0);
     assertEq(_accountDetails.delegateBalance, _amount);
@@ -131,7 +132,11 @@ contract TwabLibTest is BaseSetup {
 
     vm.warp(_secondTimestamp);
 
-    (_accountDetails, _twab, _isNewTwab) = twabLibMock.increaseBalances(0, _amount);
+    (_accountDetails, _twab, _isNewTwab) = twabLibMock.increaseBalances(
+      0,
+      _amount,
+      overwritePeriod
+    );
 
     // Check balance
     assertEq(_accountDetails.balance, 0);
@@ -154,11 +159,12 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(_amount, 0);
+    ) = twabLibMock.increaseBalances(_amount, 0, overwritePeriod);
 
     (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
       _amount,
       0,
+      overwritePeriod,
       "Revert message"
     );
 
@@ -179,7 +185,7 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(0, _amount);
+    ) = twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     assertEq(_accountDetails.balance, 0);
     assertEq(_accountDetails.delegateBalance, _amount);
@@ -193,6 +199,7 @@ contract TwabLibTest is BaseSetup {
     (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
       0,
       _amount,
+      overwritePeriod,
       "Revert message"
     );
 
@@ -219,7 +226,7 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(0, _amount);
+    ) = twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     assertEq(_accountDetails.balance, 0);
     assertEq(_accountDetails.delegateBalance, _amount);
@@ -236,6 +243,7 @@ contract TwabLibTest is BaseSetup {
     (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
       _amount + 1,
       0,
+      overwritePeriod,
       "Revert message"
     );
 
@@ -244,6 +252,7 @@ contract TwabLibTest is BaseSetup {
     (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
       0,
       _amount + 1,
+      overwritePeriod,
       "Revert message"
     );
   }
@@ -262,7 +271,7 @@ contract TwabLibTest is BaseSetup {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = twabLibMock.increaseBalances(0, _amount);
+    ) = twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     assertEq(_accountDetails.balance, 0);
     assertEq(_accountDetails.delegateBalance, _amount);
@@ -276,6 +285,7 @@ contract TwabLibTest is BaseSetup {
     (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
       0,
       _halfAmount,
+      overwritePeriod,
       "Revert message"
     );
 
@@ -291,6 +301,7 @@ contract TwabLibTest is BaseSetup {
     (_accountDetails, _twab, _isNewTwab) = twabLibMock.decreaseBalances(
       0,
       _halfAmount,
+      overwritePeriod,
       "Revert message"
     );
 
@@ -326,13 +337,13 @@ contract TwabLibTest is BaseSetup {
     assertEq(_newestTwab.timestamp, 0);
 
     vm.warp(_initialTimestamp);
-    twabLibMock.increaseBalances(0, _amount);
+    twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     vm.warp(_secondTimestamp);
-    twabLibMock.increaseBalances(0, _amount);
+    twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     vm.warp(_thirdTimestamp);
-    twabLibMock.decreaseBalances(0, _amount, "Revert message");
+    twabLibMock.decreaseBalances(0, _amount, overwritePeriod, "Revert message");
 
     (_oldestIndex, _oldestTwab) = twabLibMock.oldestTwab();
     (_newestIndex, _newestTwab) = twabLibMock.newestTwab();
@@ -355,7 +366,7 @@ contract TwabLibTest is BaseSetup {
     currentTimestamp = 2000;
 
     vm.warp(initialTimestamp);
-    twabLibMock.increaseBalances(0, 1000e18);
+    twabLibMock.increaseBalances(0, 1000e18, overwritePeriod);
   }
 
   function testgetAverageBalanceBetweenSingleBefore() public {
@@ -437,15 +448,15 @@ contract TwabLibTest is BaseSetup {
     uint112 largeAmount = 1000000e18;
 
     vm.warp(uint32(drawStart - 2 days));
-    twabLibMock.increaseBalances(amount, amount);
+    twabLibMock.increaseBalances(amount, amount, overwritePeriod);
     vm.warp(uint32(drawStart - 2 days + 12 hours));
-    twabLibMock.decreaseBalances(amount, amount, "Revert");
+    twabLibMock.decreaseBalances(amount, amount, overwritePeriod, "Revert");
     vm.warp(uint32(drawStart - 1 seconds));
-    twabLibMock.increaseBalances(largeAmount, largeAmount);
+    twabLibMock.increaseBalances(largeAmount, largeAmount, overwritePeriod);
     vm.warp(uint32(drawStart + 1 seconds));
-    twabLibMock.decreaseBalances(largeAmount, largeAmount, "Revert");
+    twabLibMock.decreaseBalances(largeAmount, largeAmount, overwritePeriod, "Revert");
     vm.warp(uint32(drawEnd + 1 days - 1 seconds));
-    twabLibMock.increaseBalances(largeAmount, largeAmount);
+    twabLibMock.increaseBalances(largeAmount, largeAmount, overwritePeriod);
 
     uint256 averageBalance = twabLibMock.getAverageBalanceBetween(drawStart, drawEnd);
     assertEq(averageBalance, 11574074074074074074);
@@ -460,10 +471,10 @@ contract TwabLibTest is BaseSetup {
     _currentTimestamp = uint32(3000);
 
     vm.warp(_initialTimestamp);
-    twabLibMock.increaseBalances(0, 1000e18);
+    twabLibMock.increaseBalances(0, 1000e18, overwritePeriod);
 
     vm.warp(_secondTimestamp);
-    twabLibMock.decreaseBalances(0, 500e18, "insufficient-balance");
+    twabLibMock.decreaseBalances(0, 500e18, overwritePeriod, "insufficient-balance");
   }
 
   function testAverageDelegateBalanceBetweenDoubleTwabBefore() public {
@@ -585,7 +596,7 @@ contract TwabLibTest is BaseSetup {
     _currentTimestamp = 2000;
 
     vm.warp(_initialTimestamp);
-    twabLibMock.increaseBalances(0, 1000e18);
+    twabLibMock.increaseBalances(0, 1000e18, overwritePeriod);
   }
 
   function testDelegateBalanceAtSingleTwabBefore() public {
@@ -610,10 +621,10 @@ contract TwabLibTest is BaseSetup {
     uint112 _amount = 1000e18;
 
     vm.warp(1630713395);
-    twabLibMock.increaseBalances(0, _amount);
+    twabLibMock.increaseBalances(0, _amount, overwritePeriod);
 
     vm.warp(1630713396);
-    twabLibMock.decreaseBalances(0, _amount, "Revert message");
+    twabLibMock.decreaseBalances(0, _amount, overwritePeriod, "Revert message");
 
     vm.warp(1675702148);
     uint256 _balance = twabLibMock.getBalanceAt(1630713395);
@@ -628,7 +639,11 @@ contract TwabLibTest is BaseSetup {
     );
 
     uint112 _amount = 1000e18;
-    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(0, _amount);
+    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(
+      0,
+      _amount,
+      overwritePeriod
+    );
 
     assertEq(accountDetails.nextTwabIndex, 3);
     assertEq(accountDetails.cardinality, 11);
@@ -647,7 +662,11 @@ contract TwabLibTest is BaseSetup {
     );
 
     uint112 _amount = 1000e18;
-    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(0, _amount);
+    (TwabLib.AccountDetails memory accountDetails, , ) = twabLibMock.increaseBalances(
+      0,
+      _amount,
+      overwritePeriod
+    );
 
     assertEq(accountDetails.nextTwabIndex, 3);
     assertEq(accountDetails.cardinality, 2 ** 16 - 1);

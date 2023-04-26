@@ -60,7 +60,8 @@ library TwabLib {
   function increaseBalances(
     Account storage _account,
     uint112 _amount,
-    uint112 _delegateAmount
+    uint112 _delegateAmount,
+    uint32 _overwritePeriod
   )
     internal
     returns (
@@ -72,7 +73,11 @@ library TwabLib {
     accountDetails = _account.details;
 
     if (_delegateAmount != uint112(0)) {
-      (accountDetails, twab, isNewTwab) = _nextTwab(_account.twabs, accountDetails);
+      (accountDetails, twab, isNewTwab) = _nextTwab(
+        _account.twabs,
+        accountDetails,
+        _overwritePeriod
+      );
     }
 
     accountDetails.balance += _amount;
@@ -94,6 +99,7 @@ library TwabLib {
     Account storage _account,
     uint112 _amount,
     uint112 _delegateAmount,
+    uint32 _overwritePeriod,
     string memory _revertMessage
   )
     internal
@@ -109,7 +115,11 @@ library TwabLib {
     require(accountDetails.delegateBalance >= _delegateAmount, _revertMessage);
 
     if (_delegateAmount != uint112(0)) {
-      (accountDetails, twab, isNewTwab) = _nextTwab(_account.twabs, accountDetails);
+      (accountDetails, twab, isNewTwab) = _nextTwab(
+        _account.twabs,
+        accountDetails,
+        _overwritePeriod
+      );
     }
 
     unchecked {
@@ -371,7 +381,8 @@ library TwabLib {
    */
   function _nextTwab(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
-    AccountDetails memory _accountDetails
+    AccountDetails memory _accountDetails,
+    uint32 _overwritePeriod
   )
     private
     returns (
@@ -402,13 +413,22 @@ library TwabLib {
       _currentTime
     );
 
+    // Create a new Observation if:
+    //  - If there's only 1 Observation
+    //  - The difference between the 2 newest stored is >= overwrite frequency
+    //  - The difference between the newest stored and the new Observation is >= overwrite frequency
     if (
       secondNewestTwab.timestamp == 0 ||
       (OverflowSafeComparatorLib.checkedSub(
         _newestTwab.timestamp,
         secondNewestTwab.timestamp,
         _currentTime
-      ) >= 1 days)
+      ) >= _overwritePeriod) ||
+      (OverflowSafeComparatorLib.checkedSub(
+        _newTwab.timestamp,
+        secondNewestTwab.timestamp,
+        _currentTime
+      ) >= _overwritePeriod)
     ) {
       _twabs[_accountDetails.nextTwabIndex] = _newTwab;
       _accountDetails.nextTwabIndex = uint16(

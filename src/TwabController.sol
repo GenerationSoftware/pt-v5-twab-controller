@@ -25,6 +25,9 @@ contract TwabController {
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
   address public constant SPONSORSHIP_ADDRESS = address(1);
 
+  /// @notice
+  uint32 public immutable overwriteFrequency;
+
   /* ============ State ============ */
 
   /// @notice Record of token holders TWABs for each account for each vault
@@ -113,6 +116,10 @@ contract TwabController {
     bool isNew,
     ObservationLib.Observation twab
   );
+
+  constructor(uint32 _overwriteFrequency) {
+    overwriteFrequency = _overwriteFrequency;
+  }
 
   /* ============ External Read Functions ============ */
 
@@ -488,7 +495,7 @@ contract TwabController {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount, overwriteFrequency);
 
     _account.details = _accountDetails;
 
@@ -517,6 +524,7 @@ contract TwabController {
         _account,
         _amount,
         _delegateAmount,
+        overwriteFrequency,
         "TC/twab-burn-lt-delegate-balance"
       );
 
@@ -546,6 +554,7 @@ contract TwabController {
         _account,
         _amount,
         _delegateAmount,
+        overwriteFrequency,
         "TC/burn-amount-exceeds-total-supply-balance"
       );
 
@@ -571,7 +580,7 @@ contract TwabController {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount, overwriteFrequency);
 
     _account.details = _accountDetails;
 

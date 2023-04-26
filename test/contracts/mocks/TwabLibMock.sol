@@ -12,13 +12,14 @@ contract TwabLibMock {
 
   function increaseBalances(
     uint112 _amount,
-    uint112 _delegateAmount
+    uint112 _delegateAmount,
+    uint32 _overwritePeriod
   ) external returns (TwabLib.AccountDetails memory, ObservationLib.Observation memory, bool) {
     (
       TwabLib.AccountDetails memory accountDetails,
       ObservationLib.Observation memory twab,
       bool isNewTwab
-    ) = TwabLib.increaseBalances(account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(account, _amount, _delegateAmount, _overwritePeriod);
     account.details = accountDetails;
     return (accountDetails, twab, isNewTwab);
   }
@@ -26,13 +27,20 @@ contract TwabLibMock {
   function decreaseBalances(
     uint112 _amount,
     uint112 _delegateAmount,
+    uint32 _overwritePeriod,
     string memory _revertMessage
   ) external returns (TwabLib.AccountDetails memory, ObservationLib.Observation memory, bool) {
     (
       TwabLib.AccountDetails memory accountDetails,
       ObservationLib.Observation memory twab,
       bool isNewTwab
-    ) = TwabLib.decreaseBalances(account, _amount, _delegateAmount, _revertMessage);
+    ) = TwabLib.decreaseBalances(
+        account,
+        _amount,
+        _delegateAmount,
+        _overwritePeriod,
+        _revertMessage
+      );
     account.details = accountDetails;
     return (accountDetails, twab, isNewTwab);
   }
