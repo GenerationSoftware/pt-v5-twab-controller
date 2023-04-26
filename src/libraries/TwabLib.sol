@@ -60,7 +60,8 @@ library TwabLib {
   function increaseBalances(
     Account storage _account,
     uint112 _amount,
-    uint112 _delegateAmount
+    uint112 _delegateAmount,
+    uint32 _overwritePeriod
   )
     internal
     returns (
@@ -72,7 +73,11 @@ library TwabLib {
     accountDetails = _account.details;
 
     if (_delegateAmount != uint112(0)) {
-      (accountDetails, twab, isNewTwab) = _nextTwab(_account.twabs, accountDetails);
+      (accountDetails, twab, isNewTwab) = _nextTwab(
+        _account.twabs,
+        accountDetails,
+        _overwritePeriod
+      );
     }
 
     accountDetails.balance += _amount;
@@ -94,6 +99,7 @@ library TwabLib {
     Account storage _account,
     uint112 _amount,
     uint112 _delegateAmount,
+    uint32 _overwritePeriod,
     string memory _revertMessage
   )
     internal
@@ -109,7 +115,11 @@ library TwabLib {
     require(accountDetails.delegateBalance >= _delegateAmount, _revertMessage);
 
     if (_delegateAmount != uint112(0)) {
-      (accountDetails, twab, isNewTwab) = _nextTwab(_account.twabs, accountDetails);
+      (accountDetails, twab, isNewTwab) = _nextTwab(
+        _account.twabs,
+        accountDetails,
+        _overwritePeriod
+      );
     }
 
     unchecked {
@@ -309,7 +319,7 @@ library TwabLib {
       return ObservationLib.Observation({ amount: 0, timestamp: _targetTimestamp });
     }
 
-    // Otherwise, both timestamps must be surrounded by twabs.
+    // Otherwise, timestamp must be surrounded by TWAB Observations
     (
       ObservationLib.Observation memory beforeOrAtStart,
       ObservationLib.Observation memory afterOrAtStart
@@ -337,7 +347,7 @@ library TwabLib {
 
   /**
    * @notice Calculates the next TWAB using the newestTwab and updated balance.
-   * @dev    Storage of the TWAB obersation is managed by the calling function and not _computeNextTwab.
+   * @dev    Storage of the TWAB obersation is managed by the calling function increaseBalances or decreaseBalances and not _computeNextTwab.
    * @param _currentTwab    Newest Observation in the Account.twabs list
    * @param _currentDelegateBalance User delegateBalance at time of most recent (newest) checkpoint write
    * @param _time           Current block.timestamp
@@ -359,8 +369,10 @@ library TwabLib {
   }
 
   /**
-   * @notice Sets a new TWAB Observation at the next available index and returns the new account.
+   * @notice Sets a new TWAB Observation at the next available index or overwrites and returns the new
+   *         account.
    * @dev Note that if `_currentTime` is before the last observation timestamp, it appears as an overflow.
+   * @dev Mutates the `_twabs` array.
    * @param _twabs The twabs array to insert into
    * @param _accountDetails The current accountDetails
    * @return accountDetails The new account details
@@ -369,7 +381,8 @@ library TwabLib {
    */
   function _nextTwab(
     ObservationLib.Observation[MAX_CARDINALITY] storage _twabs,
-    AccountDetails memory _accountDetails
+    AccountDetails memory _accountDetails,
+    uint32 _overwritePeriod
   )
     private
     returns (
@@ -400,19 +413,22 @@ library TwabLib {
       _currentTime
     );
 
-    /**
-     * TODO
-     * secondNewestTwab.timestamp will always return 0 if it has not be overwritten yet.
-     * So it means that this condition will return true for the second time the twab is updated
-     * even if less than 24 hours elapsed between the first recording.
-     */
+    // Create a new Observation if:
+    //  - If there's only 1 Observation
+    //  - The difference between the 2 newest stored is >= overwrite frequency
+    //  - The difference between the newest stored and the new Observation is >= overwrite frequency
     if (
       secondNewestTwab.timestamp == 0 ||
       (OverflowSafeComparatorLib.checkedSub(
         _newestTwab.timestamp,
         secondNewestTwab.timestamp,
         _currentTime
-      ) >= 1 days)
+      ) >= _overwritePeriod) ||
+      (OverflowSafeComparatorLib.checkedSub(
+        _newTwab.timestamp,
+        secondNewestTwab.timestamp,
+        _currentTime
+      ) >= _overwritePeriod)
     ) {
       _twabs[_accountDetails.nextTwabIndex] = _newTwab;
       _accountDetails.nextTwabIndex = uint16(

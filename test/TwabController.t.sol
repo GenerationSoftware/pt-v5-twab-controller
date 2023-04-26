@@ -54,7 +54,7 @@ contract TwabControllerTest is BaseSetup {
   function setUp() public override {
     super.setUp();
 
-    twabController = new TwabController();
+    twabController = new TwabController(1 days);
     token = new ERC20("Test", "TST");
   }
 
@@ -460,6 +460,7 @@ contract TwabControllerTest is BaseSetup {
   }
 
   /* ============ delegate ============ */
+
   function testDelegate() external {
     vm.startPrank(mockVault);
 
@@ -548,30 +549,32 @@ contract TwabControllerTest is BaseSetup {
 
   /* ============ TWAB ============ */
 
-  // TODO: Currently this test passes. It should fail/be handled differently.
-  // 2 updates to an uninitialized twab within 24h results in 2 separate TWAB observations.
-  // We want the TWAB hsitory to be a single observation per 24h period.
-  function testTwabInitialTwoInOneDay() external {
+  function testSecondObservationAlwaysStored() external {
     deal({ token: address(token), to: alice, give: 10000e18 });
 
+    TwabLib.Account memory account;
+    uint112 _amount = 1000e18;
     uint256 t0 = 1 days;
-    uint256 t1 = t0 + 12 hours;
-
-    vm.warp(t0);
+    uint256 t1 = 1 days + 12 hours;
 
     vm.startPrank(mockVault);
 
-    uint112 _amount = 1000e18;
+    vm.warp(t0);
     twabController.twabMint(alice, _amount);
+    account = twabController.getAccount(mockVault, alice);
+    assertEq(account.twabs[0].timestamp, t0);
+    assertEq(account.twabs[1].timestamp, 0);
+    assertEq(account.details.balance, _amount);
+    assertEq(account.details.delegateBalance, _amount);
 
     vm.warp(t1);
     twabController.twabMint(alice, _amount);
-
-    TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
-    TwabLib.AccountDetails memory accountDetails = account.details;
-
-    assertEq(accountDetails.balance, _amount * 2);
-    assertEq(accountDetails.delegateBalance, _amount * 2);
+    account = twabController.getAccount(mockVault, alice);
+    assertEq(account.twabs[0].timestamp, t0);
+    assertEq(account.twabs[1].timestamp, t1);
+    assertEq(account.twabs[2].timestamp, 0);
+    assertEq(account.details.balance, _amount * 2);
+    assertEq(account.details.delegateBalance, _amount * 2);
 
     (uint16 index, ObservationLib.Observation memory twab) = twabController.getNewestTwab(
       mockVault,
@@ -583,142 +586,114 @@ contract TwabControllerTest is BaseSetup {
     assertEq(index, 1);
   }
 
-  function testTwabSuccessive() external {
-    deal({ token: address(token), to: alice, give: 10000e18 });
+  struct TestTwabObservation {
+    uint256 timestamp;
+    uint112 amount;
+    uint16 expectedIndex;
+  }
 
-    uint256 t0 = 1 days;
-    uint256 t1 = t0 + 1 days;
-    uint256 t2 = t1 + 1 days;
-    uint256 t3 = t2 + 12 hours;
-
-    vm.warp(t0);
-
-    vm.startPrank(mockVault);
-
-    uint112 _amount = 1000e18;
-    twabController.twabMint(alice, _amount);
-
-    vm.warp(t1);
-    twabController.twabMint(alice, _amount);
-
-    vm.warp(t2);
-    twabController.twabBurn(alice, _amount);
-
-    TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
-    TwabLib.AccountDetails memory accountDetails = account.details;
-
-    assertEq(accountDetails.balance, _amount);
-    assertEq(accountDetails.delegateBalance, _amount);
-
-    (uint16 index, ObservationLib.Observation memory twab) = twabController.getNewestTwab(
-      mockVault,
-      alice
-    );
-
-    assertEq(twab.amount, 259200000e18);
-    assertEq(twab.timestamp, t2);
-    assertEq(index, 2);
-
-    vm.warp(t3);
-    twabController.twabMint(alice, _amount);
-
-    account = twabController.getAccount(mockVault, alice);
-
-    uint112 _totalAmount = _amount * 2;
-
-    assertEq(account.details.balance, _totalAmount);
-    assertEq(account.details.delegateBalance, _totalAmount);
-
-    (index, twab) = twabController.getNewestTwab(mockVault, alice);
-
-    assertEq(twab.amount, 302400000e18);
-    assertEq(twab.timestamp, t3);
-    assertEq(index, 3);
-
+  function validateTwabMintObservation(
+    address vault,
+    address user,
+    TestTwabObservation memory twab
+  ) internal {
+    vm.startPrank(vault);
+    vm.warp(twab.timestamp);
+    twabController.twabMint(user, twab.amount);
+    TwabLib.Account memory account = twabController.getAccount(vault, user);
+    assertEq(account.twabs[twab.expectedIndex].timestamp, twab.timestamp);
+    assertEq(account.twabs[twab.expectedIndex + 1].timestamp, 0);
+    assertEq(account.details.nextTwabIndex, twab.expectedIndex + 1);
+    assertEq(account.details.cardinality, twab.expectedIndex + 1);
     vm.stopPrank();
   }
 
-  function testTwabOverwrite() external {
+  function validateTwabBurnObservation(
+    address vault,
+    address user,
+    TestTwabObservation memory twab
+  ) internal {
+    vm.startPrank(vault);
+    vm.warp(twab.timestamp);
+    twabController.twabBurn(user, twab.amount);
+    TwabLib.Account memory account = twabController.getAccount(vault, user);
+    assertEq(account.twabs[twab.expectedIndex].timestamp, twab.timestamp);
+    assertEq(account.twabs[twab.expectedIndex + 1].timestamp, 0);
+    assertEq(account.details.nextTwabIndex, twab.expectedIndex + 1);
+    assertEq(account.details.cardinality, twab.expectedIndex + 1);
+    vm.stopPrank();
+  }
+
+  function validateTwabMintObservations(
+    address vault,
+    address user,
+    TestTwabObservation[] memory twabs
+  ) internal {
+    uint256 totalBalance = 0;
+    for (uint256 i = 0; i < twabs.length; i++) {
+      // Update TWAB and validate it overwrote properly
+      validateTwabMintObservation(vault, user, twabs[i]);
+
+      // Validate balances
+      uint256 balance = twabController.balanceOf(vault, user);
+      uint256 delegateBalance = twabController.delegateBalanceOf(vault, user);
+      totalBalance += twabs[i].amount;
+      assertEq(balance, totalBalance);
+      assertEq(delegateBalance, totalBalance);
+    }
+  }
+
+  function testOverwriteObservations_HappyPath() external {
+    uint112 amount = 1e18;
+    TestTwabObservation[] memory testTwabs = new TestTwabObservation[](8);
+    testTwabs[0] = TestTwabObservation(1 days, amount, 0);
+    testTwabs[1] = TestTwabObservation(1 days + 1 hours, amount, 1);
+    testTwabs[2] = TestTwabObservation(1 days + 2 hours, amount, 1);
+    testTwabs[3] = TestTwabObservation(1 days + 3 hours, amount, 1);
+    // >24h from testTwabs[0]
+    testTwabs[4] = TestTwabObservation(2 days, amount, 2);
+    testTwabs[5] = TestTwabObservation(2 days + 1 hours, amount, 2);
+    // >24h from testTwabs[3]
+    testTwabs[6] = TestTwabObservation(3 days, amount, 3);
+    // >24h from testTwabs[5]
+    testTwabs[7] = TestTwabObservation(3 days + 1 hours, amount, 4);
+    validateTwabMintObservations(mockVault, alice, testTwabs);
+  }
+
+  function testOverwriteObservations_LongPeriodBetween() external {
+    uint112 amount = 1e18;
+    TestTwabObservation[] memory testTwabs = new TestTwabObservation[](7);
+    testTwabs[0] = TestTwabObservation(1 days, amount, 0);
+    testTwabs[1] = TestTwabObservation(1 days + 1 hours, amount, 1);
+    // >24h from testTwabs[0]
+    testTwabs[2] = TestTwabObservation(2 days + 1 hours, amount, 2);
+    // >24h from testTwabs[1]
+    testTwabs[3] = TestTwabObservation(2 days + 2 hours, amount, 3);
+    testTwabs[4] = TestTwabObservation(2 days + 3 hours, amount, 3);
+    // >24h from testTwabs[3]
+    // Large amount of time between, next 2 should be fresh writes
+    testTwabs[5] = TestTwabObservation(42 days, amount, 4);
+    testTwabs[6] = TestTwabObservation(42 days + 1 hours, amount, 5);
+    validateTwabMintObservations(mockVault, alice, testTwabs);
+  }
+
+  function testOverwriteObservations_FullStateCheck() external {
+    uint112 amount = 1e18;
+    TestTwabObservation[] memory testTwabs = new TestTwabObservation[](5);
+    testTwabs[0] = TestTwabObservation(1 days, amount, 0);
+    testTwabs[1] = TestTwabObservation(2 days, amount, 1);
+    // >24h from testTwabs[0]
+    testTwabs[2] = TestTwabObservation(3 days, amount, 2);
+    // >24h from testTwabs[1]
+    testTwabs[3] = TestTwabObservation(3 days + 12 hours, amount, 3);
+    testTwabs[4] = TestTwabObservation(3 days + 18 hours, amount, 3);
+    validateTwabMintObservations(mockVault, alice, testTwabs);
+
     TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
-    TwabLib.AccountDetails memory accountDetails = account.details;
-
-    // twab 0 0 86400s (1 day)
-    // twab 1 8640000000000000000000000 172800s (2 days)
-    // twab 2 25920000000000000000000000 259200s (3 days)
-    // twab 3 30240000000000000000000000 324000s (3 days + 12 hours)
-    // twab 4 0 0
-
-    uint256 t0 = 1 days;
-    uint256 t1 = 2 days;
-    uint256 t2 = 3 days;
-    uint256 t3 = 3 days + 12 hours;
-    uint256 t4 = 3 days + 18 hours;
-
-    vm.warp(t0);
-
-    vm.startPrank(mockVault);
-
-    uint112 _amount = 1000e18;
-    twabController.twabMint(alice, _amount);
-
-    account = twabController.getAccount(mockVault, alice);
-    accountDetails = account.details;
-
-    assertEq(accountDetails.balance, _amount);
-    assertEq(accountDetails.delegateBalance, _amount);
-    assertEq(accountDetails.nextTwabIndex, 1);
-    assertEq(accountDetails.cardinality, 1);
-
-    vm.warp(t1);
-    twabController.twabMint(alice, _amount);
-
-    account = twabController.getAccount(mockVault, alice);
-    accountDetails = account.details;
-
-    uint112 _totalAmount = _amount * 2;
-
-    assertEq(accountDetails.balance, _totalAmount);
-    assertEq(accountDetails.delegateBalance, _totalAmount);
-    assertEq(accountDetails.nextTwabIndex, 2);
-    assertEq(accountDetails.cardinality, 2);
-
-    vm.warp(t2);
-    twabController.twabBurn(alice, _amount);
-
-    account = twabController.getAccount(mockVault, alice);
-    accountDetails = account.details;
-
-    assertEq(accountDetails.balance, _amount);
-    assertEq(accountDetails.delegateBalance, _amount);
-    assertEq(accountDetails.nextTwabIndex, 3);
-    assertEq(accountDetails.cardinality, 3);
-
-    vm.warp(t3);
-    twabController.twabBurn(alice, _amount);
-
-    account = twabController.getAccount(mockVault, alice);
-    accountDetails = account.details;
-
-    assertEq(accountDetails.balance, 0);
-    assertEq(accountDetails.delegateBalance, 0);
-    assertEq(accountDetails.nextTwabIndex, 4);
-    assertEq(accountDetails.cardinality, 4);
-
-    vm.warp(t4);
-    twabController.twabMint(alice, _amount);
-
-    account = twabController.getAccount(mockVault, alice);
-    accountDetails = account.details;
-
-    assertEq(accountDetails.balance, _amount);
-    assertEq(accountDetails.delegateBalance, _amount);
-    assertEq(accountDetails.nextTwabIndex, 4);
-    assertEq(accountDetails.cardinality, 4);
-
     assertEq(account.twabs[0].amount, 0);
-    assertEq(account.twabs[1].amount, 86400000e18);
-    assertEq(account.twabs[2].amount, 259200000e18);
-    assertEq(account.twabs[3].amount, 302400000e18);
+    assertEq(account.twabs[1].amount, 86400e18);
+    assertEq(account.twabs[2].amount, 259200e18);
+    assertEq(account.twabs[3].amount, 475200e18);
     assertEq(account.twabs[4].amount, 0);
 
     (uint16 index, ObservationLib.Observation memory twab) = twabController.getNewestTwab(
@@ -726,11 +701,9 @@ contract TwabControllerTest is BaseSetup {
       alice
     );
 
-    assertEq(twab.amount, 302400000e18);
-    assertEq(twab.timestamp, t4);
+    assertEq(twab.amount, 475200e18);
+    assertEq(twab.timestamp, 3 days + 18 hours);
     assertEq(index, 3);
-
-    vm.stopPrank();
   }
 
   function testGetOldestAndNewestTwab() external {
@@ -770,5 +743,221 @@ contract TwabControllerTest is BaseSetup {
     assertEq(oldestIndex, 1);
 
     vm.stopPrank();
+  }
+
+  function testFlashLoanMitigation() external {
+    uint112 amount = 1e18;
+    uint112 largeAmount = 1000000e18;
+    uint32 drawStart = 4 days;
+    uint32 drawEnd = 5 days;
+
+    // Get the TWAB controller into a state where it has some TWAB history
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 2 days, amount, 0)
+    );
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 1 days, amount, 1)
+    );
+
+    // Store actual balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + 1 days - 1 seconds);
+    uint256 actualDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    // Flash loan deposit immediately at draw start
+    validateTwabMintObservation(mockVault, alice, TestTwabObservation(drawStart, largeAmount, 2));
+
+    // Withdraw in the same block
+    // Second event in the same block doesn't trigger a new event
+    // Next observation will have no concept of the flash loan
+    // Can I take the flash loan, trigger a new observation, claim, then burn it?
+    // The flash loan will only be counted for the period of time it was held. Since all of this happens in the same block it will not be captured.
+    validateTwabBurnObservation(mockVault, alice, TestTwabObservation(drawStart, largeAmount, 2));
+
+    // Store manipulated balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + 1 days - 1 seconds);
+    uint256 manipulatedDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    assertEq(manipulatedDrawBalance, actualDrawBalance);
+  }
+
+  function testImmediateWithdrawalMitigation() external {
+    uint112 amount = 1e18;
+    uint112 largeAmount = 1000000e18;
+    uint32 drawStart = 4 days;
+    uint32 drawEnd = 5 days;
+
+    // Get the TWAB controller into a state where it has some TWAB history
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 2 days, amount, 0)
+    );
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 2 days + 12 hours, amount, 1)
+    );
+
+    // Deposit immediately before draw start
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 1 seconds, largeAmount, 2)
+    );
+
+    // Withdraw immediately after draw start
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart + 1 seconds, largeAmount, 3)
+    );
+
+    // Store actual balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + 1 days - 1 seconds);
+    uint256 actualDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    // Overwrite with large amount to force average across the entire draw period
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawEnd + 1 days - 1 seconds, largeAmount, 4)
+    );
+
+    // Store attempted manipulated balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + 1 days - 1 seconds);
+    uint256 manipulatedDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    assertEq(manipulatedDrawBalance, actualDrawBalance);
+  }
+
+  // ======================= Exploits =======================
+
+  // By creating tailored Observations post a TWAB Observation overwrite period, we can manipulate historic TWABs to be higher than they actually were.
+  function testExploit_ObservationPostPeriodEnd() external {
+    uint112 amount = 1e18;
+    uint112 largeAmount = 1000000e18;
+    uint32 drawStart = 4 days;
+    uint32 drawEnd = 5 days;
+
+    // Get the TWAB controller into a state where it has some TWAB history so we can ignore the special cases of the first and second Observations.
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 3 days, amount, 0)
+    );
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart - 2 days, amount, 1)
+    );
+
+    // Create an Observation such that the next Observation will be recorded in a new slot and the Observation after that will overwrite the first.
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawStart + 1 seconds, amount * 2, 2)
+    );
+
+    // Store the actual balance during draw N at the end of draw N+1 (last moment that it is still claimable).
+    vm.warp(drawEnd + 1 days - 1 seconds);
+    uint256 actualDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    // Deposit when draw N ends and draw N+1 begins.
+    validateTwabMintObservation(mockVault, alice, TestTwabObservation(drawEnd, largeAmount, 3));
+
+    // Withdraw when draw N+1 ends to overwrite the end TWAB Observation used to compute the average held during draw N.
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawEnd + 1 days - 1 seconds, largeAmount, 4)
+    );
+
+    // Store manipulated balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + 1 days - 1 seconds);
+    uint256 manipulatedDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    assertEq(manipulatedDrawBalance, actualDrawBalance);
+  }
+
+  function testExploit_FullObservationPostPeriodEnd() external {
+    uint32 overwriteFrequency = 1 days;
+    uint32 overwritesPerDraw = 24;
+    uint112 smallAmount = 1e18;
+    uint112 largeAmount = 1000000e18;
+    // Setup such that the draw to manipulate is the second draw
+    uint32 drawDuration = overwriteFrequency * overwritesPerDraw;
+    uint32 drawStart = 0;
+    uint32 drawEnd = drawStart + drawDuration;
+
+    // Create an Observation such that the next Observation will be recorded in a new slot and the Observation after that will overwrite the first.
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawEnd - overwriteFrequency + 1 seconds, smallAmount, 0)
+    );
+
+    // Store the actual balance during draw N at the end of draw N+1 (last moment that it is still claimable).
+    vm.warp(drawEnd + drawDuration - 1 seconds);
+    uint256 actualDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    // Deposit when overwrite period N ends and period N+1 begins.
+    validateTwabMintObservation(mockVault, alice, TestTwabObservation(drawEnd, largeAmount, 1));
+
+    // Withdraw when draw N+1 ends to overwrite the end TWAB Observation used to compute the average held during draw N.
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawEnd + overwriteFrequency - 1 seconds, largeAmount, 2)
+    );
+
+    // Store manipulated balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + drawDuration - 1 seconds);
+    uint256 manipulatedDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    assertEq(manipulatedDrawBalance, actualDrawBalance);
   }
 }

@@ -12,18 +12,21 @@ import { ExtendedSafeCastLib } from "./libraries/ExtendedSafeCastLib.sol";
  * @author PoolTogether Inc Team
  * @dev    Time-Weighted Average Balance Controller for ERC20 tokens.
  * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical
-              lookups to a user(s) time-weighted average balance. Each user is mapped to an
-              Account struct containing the TWAB history (ring buffer) and ring buffer parameters.
-              Every token.transfer() creates a new TWAB checkpoint. The new TWAB checkpoint is
-              stored in the circular ring buffer, as either a new checkpoint or rewriting a
-              previous checkpoint with new parameters. One checkpoint per day is stored.
-              The TwabLib guarantees minimum 1 year of search history.
+            lookups to a user(s) time-weighted average balance. Each user is mapped to an
+            Account struct containing the TWAB history (ring buffer) and ring buffer parameters.
+            Every token.transfer() creates a new TWAB observation. The new TWAB observation is
+            stored in the circular ring buffer, as either a new observation or rewriting a
+            previous observation with new parameters. One observation per day is stored.
+            The TwabLib guarantees minimum 1 year of search history.
  */
 contract TwabController {
   using ExtendedSafeCastLib for uint256;
 
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
   address public constant SPONSORSHIP_ADDRESS = address(1);
+
+  /// @notice
+  uint32 public immutable overwriteFrequency;
 
   /* ============ State ============ */
 
@@ -33,11 +36,20 @@ contract TwabController {
   /// @notice Record of tickets total supply and ring buff parameters used for observation.
   mapping(address => TwabLib.Account) internal totalSupplyTwab;
 
-  // vault => user => delegate
+  /// @notice vault => user => delegate
   mapping(address => mapping(address => address)) internal delegates;
 
   /* ============ Events ============ */
 
+  /**
+   * @notice Emitted when a balance or delegateBalance is increased.
+   * @param vault the vault for which the balance increased
+   * @param user the users who's balance increased
+   * @param amount the amount the balance increased by
+   * @param delegateAmount the amount the delegateBalance increased by
+   * @param isNew whether the twab observation is new or not
+   * @param twab the observation that was created or updated
+   */
   event IncreasedBalance(
     address indexed vault,
     address indexed user,
@@ -47,6 +59,15 @@ contract TwabController {
     ObservationLib.Observation twab
   );
 
+  /**
+   * @notice Emited when a balance or delegateBalance is decreased.
+   * @param vault the vault for which the balance decreased
+   * @param user the users who's balance decreased
+   * @param amount the amount the balance decreased by
+   * @param delegateAmount the amount the delegateBalance decreased by
+   * @param isNew whether the twab observation is new or not
+   * @param twab the observation that was created or updated
+   */
   event DecreasedBalance(
     address indexed vault,
     address indexed user,
@@ -56,8 +77,22 @@ contract TwabController {
     ObservationLib.Observation twab
   );
 
+  /**
+   * @notice Emitted when a user delegates their balance to another address.
+   * @param vault the vault for which the balance was delegated
+   * @param delegator the user who delegated their balance
+   * @param delegate the user who received the delegated balance
+   */
   event Delegated(address indexed vault, address indexed delegator, address indexed delegate);
 
+  /**
+   * @notice Emitted when the total supply or delegateTotalSupply is increased.
+   * @param vault the vault for which the total supply increased
+   * @param amount the amount the total supply increased by
+   * @param delegateAmount the amount the delegateTotalSupply increased by
+   * @param isNew whether the twab observation is new or not
+   * @param twab the observation that was created or updated
+   */
   event IncreasedTotalSupply(
     address indexed vault,
     uint112 amount,
@@ -66,6 +101,14 @@ contract TwabController {
     ObservationLib.Observation twab
   );
 
+  /**
+   * @notice Emitted when the total supply or delegateTotalSupply is decreased.
+   * @param vault the vault for which the total supply decreased
+   * @param amount the amount the total supply decreased by
+   * @param delegateAmount the amount the delegateTotalSupply decreased by
+   * @param isNew whether the twab observation is new or not
+   * @param twab the observation that was created or updated
+   */
   event DecreasedTotalSupply(
     address indexed vault,
     uint112 amount,
@@ -74,107 +117,210 @@ contract TwabController {
     ObservationLib.Observation twab
   );
 
+  constructor(uint32 _overwriteFrequency) {
+    overwriteFrequency = _overwriteFrequency;
+  }
+
   /* ============ External Read Functions ============ */
 
+  /**
+   * @notice Loads the current TWAB Account data for a specific vault stored for a user
+   * @dev Note this is a very expensive function
+   * @param vault the vault for which the data is being queried
+   * @param user the user who's data is being queried
+   * @return The current TWAB Account data of the user
+   */
+  function getAccount(address vault, address user) external view returns (TwabLib.Account memory) {
+    return userTwabs[vault][user];
+  }
+
+  /**
+   * @notice The current token balance of a user for a specific vault
+   * @param vault the vault for which the balance is being queried
+   * @param user the user who's balance is being queried
+   * @return The current token balance of the user
+   */
   function balanceOf(address vault, address user) external view returns (uint256) {
     return userTwabs[vault][user].details.balance;
   }
 
+  /**
+   * @notice The total supply of tokens for a vault
+   * @param vault the vault for which the total supply is being queried
+   * @return The total supply of tokens for a vault
+   */
   function totalSupply(address vault) external view returns (uint256) {
     return totalSupplyTwab[vault].details.balance;
   }
 
+  /**
+   * @notice The total delegated amount of tokens for a vault.
+   * @dev Delegated balance is not 1:1 with the token total supply. Users may delegate their
+   *      balance to the sponsorship address, which will result in those tokens being subtracted
+   *      from the total.
+   * @param vault the vault for which the total delegated supply is being queried
+   * @return The total delegated amount of tokens for a vault
+   */
   function totalSupplyDelegateBalance(address vault) external view returns (uint256) {
     return totalSupplyTwab[vault].details.delegateBalance;
   }
 
-  function delegateOf(address _vault, address _user) external view returns (address) {
-    return _delegateOf(_vault, _user);
+  /**
+   * @notice The current delegate of a user for a specific vault
+   * @param vault the vault for which the delegate balance is being queried
+   * @param user the user who's delegate balance is being queried
+   * @return The current delegate balance of the user
+   */
+  function delegateOf(address vault, address user) external view returns (address) {
+    return _delegateOf(vault, user);
   }
 
+  /**
+   * @notice The current delegateBalance of a user for a specific vault
+   * @dev the delegateBalance is the sum of delegated balance to this user
+   * @param vault the vault for which the delegateBalance is being queried
+   * @param user the user who's delegateBalance is being queried
+   * @return The current delegateBalance of the user
+   */
   function delegateBalanceOf(address vault, address user) external view returns (uint256) {
     return userTwabs[vault][user].details.delegateBalance;
   }
 
-  function getAccount(address vault, address _user) external view returns (TwabLib.Account memory) {
-    return userTwabs[vault][_user];
-  }
-
+  /**
+   * @notice Looks up a users balance at a specific time in the past
+   * @param vault the vault for which the balance is being queried
+   * @param user the user who's balance is being queried
+   * @param targetTime the time in the past for which the balance is being queried
+   * @return The balance of the user at the target time
+   */
   function getBalanceAt(
-    address _vault,
-    address _user,
-    uint32 _targetTime
+    address vault,
+    address user,
+    uint32 targetTime
   ) external view returns (uint256) {
-    TwabLib.Account storage _account = userTwabs[_vault][_user];
-
-    return TwabLib.getBalanceAt(_account.twabs, _account.details, _targetTime);
+    TwabLib.Account storage _account = userTwabs[vault][user];
+    return TwabLib.getBalanceAt(_account.twabs, _account.details, targetTime);
   }
 
-  function getTotalSupplyAt(address _vault, uint32 _targetTime) external view returns (uint256) {
-    TwabLib.Account storage _account = totalSupplyTwab[_vault];
-
-    return TwabLib.getBalanceAt(_account.twabs, _account.details, _targetTime);
+  /**
+   * @notice Looks up the total supply at a specific time in the past
+   * @param vault the vault for which the total supply is being queried
+   * @param targetTime the time in the past for which the total supply is being queried
+   * @return The total supply at the target time
+   */
+  function getTotalSupplyAt(address vault, uint32 targetTime) external view returns (uint256) {
+    TwabLib.Account storage _account = totalSupplyTwab[vault];
+    return TwabLib.getBalanceAt(_account.twabs, _account.details, targetTime);
   }
 
+  /**
+   * @notice Looks up the average balance of a user between two timestamps
+   * @dev Timestamps are Unix timestamps denominated in seconds
+   * @param vault the vault for which the average balance is being queried
+   * @param user the user who's average balance is being queried
+   * @param startTime the start of the time range for which the average balance is being queried
+   * @param endTime the end of the time range for which the average balance is being queried
+   * @return The average balance of the user between the two timestamps
+   */
   function getAverageBalanceBetween(
-    address _vault,
-    address _user,
-    uint32 _startTime,
-    uint32 _endTime
+    address vault,
+    address user,
+    uint32 startTime,
+    uint32 endTime
   ) external view returns (uint256) {
-    TwabLib.Account storage _account = userTwabs[_vault][_user];
-
-    return TwabLib.getAverageBalanceBetween(_account.twabs, _account.details, _startTime, _endTime);
+    TwabLib.Account storage _account = userTwabs[vault][user];
+    return TwabLib.getAverageBalanceBetween(_account.twabs, _account.details, startTime, endTime);
   }
 
+  /**
+   * @notice Looks up the average total supply between two timestamps
+   * @dev Timestamps are Unix timestamps denominated in seconds
+   * @param vault the vault for which the average total supply is being queried
+   * @param startTime the start of the time range for which the average total supply is being queried
+   * @param endTime the end of the time range for which the average total supply is being queried
+   * @return The average total supply between the two timestamps
+   */
   function getAverageTotalSupplyBetween(
-    address _vault,
-    uint32 _startTime,
-    uint32 _endTime
+    address vault,
+    uint32 startTime,
+    uint32 endTime
   ) external view returns (uint256) {
-    TwabLib.Account storage _account = totalSupplyTwab[_vault];
-
-    return TwabLib.getAverageBalanceBetween(_account.twabs, _account.details, _startTime, _endTime);
+    TwabLib.Account storage _account = totalSupplyTwab[vault];
+    return TwabLib.getAverageBalanceBetween(_account.twabs, _account.details, startTime, endTime);
   }
 
+  /**
+   * @notice Looks up the newest twab observation for a user
+   * @param vault the vault for which the twab is being queried
+   * @param user the user who's twab is being queried
+   * @return index The index of the twab observation
+   * @return twab The twab observation of the user
+   */
   function getNewestTwab(
-    address _vault,
-    address _user
+    address vault,
+    address user
   ) external view returns (uint16 index, ObservationLib.Observation memory twab) {
-    TwabLib.Account storage _account = userTwabs[_vault][_user];
-
+    TwabLib.Account storage _account = userTwabs[vault][user];
     return TwabLib.newestTwab(_account.twabs, _account.details);
   }
 
+  /**
+   * @notice Looks up the oldest twab observation for a user
+   * @param vault the vault for which the twab is being queried
+   * @param user the user who's twab is being queried
+   * @return index The index of the twab observation
+   * @return twab The twab observation of the user
+   */
   function getOldestTwab(
-    address _vault,
-    address _user
+    address vault,
+    address user
   ) external view returns (uint16 index, ObservationLib.Observation memory twab) {
-    TwabLib.Account storage _account = userTwabs[_vault][_user];
-
+    TwabLib.Account storage _account = userTwabs[vault][user];
     return TwabLib.oldestTwab(_account.twabs, _account.details);
   }
 
   /* ============ External Write Functions ============ */
 
-  // Updates the users (or delegates) delegateBalance
-  // Updates the users token balance
+  /**
+   * @notice Mints new balance and delegateBalance for a given user
+   * @dev Note that if the provided user to mint to is delegating that the delegate's
+   *      delegateBalance will be updated.
+   * @param _to The address to mint balance and delegateBalance to
+   * @param _amount The amount to mint
+   */
   function twabMint(address _to, uint112 _amount) external {
     _transferBalance(msg.sender, address(0), _to, _amount);
   }
 
-  // Updates the users (or delegates) delegateBalance
-  // Updates the users token balance
+  /**
+   * @notice Burns balance and delegateBalance for a given user
+   * @dev Note that if the provided user to burn from is delegating that the delegate's
+   *      delegateBalance will be updated.
+   * @param _from The address to burn balance and delegateBalance from
+   * @param _amount The amount to burn
+   */
   function twabBurn(address _from, uint112 _amount) external {
     _transferBalance(msg.sender, _from, address(0), _amount);
   }
 
-  // Updates the users (or delegates) delegateBalance
-  // Updates the users token balance
+  /**
+   * @notice Transfers balance and delegateBalance from a given user
+   * @dev Note that if the provided user to transfer from is delegating that the delegate's
+   *      delegateBalance will be updated.
+   * @param _from The address to transfer the balance and delegateBalance from
+   * @param _to The address to transfer balance and delegateBalance to
+   * @param _amount The amount to transfer
+   */
   function twabTransfer(address _from, address _to, uint112 _amount) external {
     _transferBalance(msg.sender, _from, _to, _amount);
   }
 
+  /**
+   * @notice Sets a delegate for a user which forwards the delegateBalance tied to the user's
+   *          balance to the delegate's delegateBalance.
+   * @param _vault The vault for which the delegate is being set
+   * @param _to the address to delegate to
+   */
   function delegate(address _vault, address _to) external {
     _delegate(_vault, msg.sender, _to);
   }
@@ -190,6 +336,15 @@ contract TwabController {
 
   /* ============ Internal Functions ============ */
 
+  /**
+   * @notice Transfers a user's vault balance from one address to another.
+   * @dev If the user is delegating, their delegate's delegateBalance is also updated.
+   * @dev If we are minting or burning tokens then the total supply is also updated.
+   * @param _vault the vault for which the balance is being transferred
+   * @param _from the address from which the balance is being transferred
+   * @param _to the address to which the balance is being transferred
+   * @param _amount the amount of balance being transferred
+   */
   function _transferBalance(address _vault, address _from, address _to, uint112 _amount) internal {
     if (_from == _to) {
       return;
@@ -243,6 +398,12 @@ contract TwabController {
     }
   }
 
+  /**
+   * @notice Looks up the delegate of a user.
+   * @param _vault the vault for which the user's delegate is being queried
+   * @param _user the address to query the delegate of
+   * @return The address of the user's delegate
+   */
   function _delegateOf(address _vault, address _user) internal view returns (address) {
     address _userDelegate;
 
@@ -258,6 +419,13 @@ contract TwabController {
     return _userDelegate;
   }
 
+  /**
+   * @notice Transfers a user's vault delegateBalance from one address to another.
+   * @param _vault the vault for which the delegateBalance is being transferred
+   * @param _fromDelegate the address from which the delegateBalance is being transferred
+   * @param _toDelegate the address to which the delegateBalance is being transferred
+   * @param _amount the amount of delegateBalance being transferred
+   */
   function _transferDelegateBalance(
     address _vault,
     address _fromDelegate,
@@ -285,22 +453,36 @@ contract TwabController {
     }
   }
 
-  function _delegate(address _vault, address _from, address _toDelegate) internal {
+  /**
+   * @notice Sets a delegate for a user which forwards the delegateBalance tied to the user's
+   *          balance to the delegate's delegateBalance.
+   * @param _vault The vault for which the delegate is being set
+   * @param _from the address to delegate from
+   * @param _to the address to delegate to
+   */
+  function _delegate(address _vault, address _from, address _to) internal {
     address _currentDelegate = _delegateOf(_vault, _from);
-    require(_toDelegate != _currentDelegate, "TC/delegate-already-set");
+    require(_to != _currentDelegate, "TC/delegate-already-set");
 
-    delegates[_vault][_from] = _toDelegate;
+    delegates[_vault][_from] = _to;
 
     _transferDelegateBalance(
       _vault,
       _currentDelegate,
-      _toDelegate,
+      _to,
       userTwabs[_vault][_from].details.balance
     );
 
-    emit Delegated(_vault, _from, _toDelegate);
+    emit Delegated(_vault, _from, _to);
   }
 
+  /**
+   * @notice Increases a user's balance and delegateBalance for a specific vault.
+   * @param _vault the vault for which the balance is being increased
+   * @param _user the address of the user whose balance is being increased
+   * @param _amount the amount of balance being increased
+   * @param _delegateAmount the amount of delegateBalance being increased
+   */
   function _increaseBalances(
     address _vault,
     address _user,
@@ -313,13 +495,19 @@ contract TwabController {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount, overwriteFrequency);
 
     _account.details = _accountDetails;
 
     emit IncreasedBalance(_vault, _user, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 
+  /**
+   * @notice Decreases the a user's balance and delegateBalance for a specific vault.
+   * @param _vault the vault for which the totalSupply balance is being decreased
+   * @param _amount the amount of balance being decreased
+   * @param _delegateAmount the amount of delegateBalance being decreased
+   */
   function _decreaseBalances(
     address _vault,
     address _user,
@@ -336,6 +524,7 @@ contract TwabController {
         _account,
         _amount,
         _delegateAmount,
+        overwriteFrequency,
         "TC/twab-burn-lt-delegate-balance"
       );
 
@@ -344,6 +533,12 @@ contract TwabController {
     emit DecreasedBalance(_vault, _user, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 
+  /**
+   * @notice Decreases the totalSupply balance and delegateBalance for a specific vault.
+   * @param _vault the vault for which the totalSupply balance is being decreased
+   * @param _amount the amount of balance being decreased
+   * @param _delegateAmount the amount of delegateBalance being decreased
+   */
   function _decreaseTotalSupplyBalances(
     address _vault,
     uint112 _amount,
@@ -359,6 +554,7 @@ contract TwabController {
         _account,
         _amount,
         _delegateAmount,
+        overwriteFrequency,
         "TC/burn-amount-exceeds-total-supply-balance"
       );
 
@@ -367,6 +563,12 @@ contract TwabController {
     emit DecreasedTotalSupply(_vault, _amount, _delegateAmount, _isNewTwab, _twab);
   }
 
+  /**
+   * @notice Increases the totalSupply balance and delegateBalance for a specific vault.
+   * @param _vault the vault for which the totalSupply balance is being increased
+   * @param _amount the amount of balance being increased
+   * @param _delegateAmount the amount of delegateBalance being increased
+   */
   function _increaseTotalSupplyBalances(
     address _vault,
     uint112 _amount,
@@ -378,7 +580,7 @@ contract TwabController {
       TwabLib.AccountDetails memory _accountDetails,
       ObservationLib.Observation memory _twab,
       bool _isNewTwab
-    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount, overwriteFrequency);
 
     _account.details = _accountDetails;
 
