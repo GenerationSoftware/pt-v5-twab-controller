@@ -847,7 +847,7 @@ contract TwabControllerTest is BaseSetup {
   // ======================= Exploits =======================
 
   // By creating tailored Observations post a TWAB Observation overwrite period, we can manipulate historic TWABs to be higher than they actually were.
-  function testFailExploit_ObservationPostPeriodEnd() external {
+  function testExploit_ObservationPostPeriodEnd() external {
     uint112 amount = 1e18;
     uint112 largeAmount = 1000000e18;
     uint32 drawStart = 4 days;
@@ -908,6 +908,68 @@ contract TwabControllerTest is BaseSetup {
       drawStart,
       drawEnd
     );
+
+    assertEq(manipulatedDrawBalance, actualDrawBalance);
+  }
+
+  function testExploit_FullObservationPostPeriodEnd() external {
+    uint32 overwriteFrequency = 1 days;
+    uint32 overwritesPerDraw = 24;
+    uint112 smallAmount = 1e18;
+    uint112 largeAmount = 1000000e18;
+    // Setup such that the draw to manipulate is the second draw
+    uint32 drawDuration = overwriteFrequency * overwritesPerDraw;
+    uint32 drawStart = 0;
+    uint32 drawEnd = drawStart + drawDuration;
+
+    console.log("drawStart    %s", drawStart);
+    console.log("drawEnd      %s", drawEnd);
+
+    // Create an Observation such that the next Observation will be recorded in a new slot and the Observation after that will overwrite the first.
+    validateTwabMintObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawEnd - overwriteFrequency + 1 seconds, smallAmount, 1)
+    );
+
+    // Store the actual balance during draw N at the end of draw N+1 (last moment that it is still claimable).
+    vm.warp(drawEnd + drawDuration - 1 seconds);
+    uint256 actualDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+
+    console.log("Pre manipuiation");
+    console.log("actualDrawBalance    %s", actualDrawBalance);
+    logObservations(6);
+
+    // Deposit when overwrite period N ends and period N+1 begins.
+    validateTwabMintObservation(mockVault, alice, TestTwabObservation(drawEnd, largeAmount, 1));
+
+    console.log("Post large deposit");
+    logObservations(6);
+
+    // Withdraw when draw N+1 ends to overwrite the end TWAB Observation used to compute the average held during draw N.
+    validateTwabBurnObservation(
+      mockVault,
+      alice,
+      TestTwabObservation(drawEnd + overwriteFrequency - 1 seconds, largeAmount, 1)
+    );
+
+    console.log("Post withdrawal of large deposit");
+    logObservations(6);
+
+    // Store manipulated balance during draw N at the end of draw N+1
+    vm.warp(drawEnd + drawDuration - 1 seconds);
+    uint256 manipulatedDrawBalance = twabController.getAverageBalanceBetween(
+      mockVault,
+      alice,
+      drawStart,
+      drawEnd
+    );
+    console.log("manipulatedDrawBalance    %s", manipulatedDrawBalance);
 
     assertEq(manipulatedDrawBalance, actualDrawBalance);
   }
