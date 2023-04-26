@@ -45,7 +45,7 @@ contract TwabController {
    * @notice Emitted when a balance or delegateBalance is increased.
    * @param vault the vault for which the balance increased
    * @param user the users who's balance increased
-   * @param amount the amount the balance increase by
+   * @param amount the amount the balance increased by
    * @param delegateAmount the amount the delegateBalance increased by
    * @param isNew whether the twab observation is new or not
    * @param twab the observation that was created or updated
@@ -177,7 +177,7 @@ contract TwabController {
 
   /**
    * @notice The current delegateBalance of a user for a specific vault
-   * @dev the delegateBalance is the sum of delegated balance to this user. This is
+   * @dev the delegateBalance is the sum of delegated balance to this user
    * @param vault the vault for which the delegateBalance is being queried
    * @param user the user who's delegateBalance is being queried
    * @return The current delegateBalance of the user
@@ -286,7 +286,7 @@ contract TwabController {
    * @dev Note that if the provided user to mint to is delegating that the delegate's
    *      delegateBalance will be updated.
    * @param _to The address to mint balance and delegateBalance to
-   * @param _amount THe amount to mint
+   * @param _amount The amount to mint
    */
   function twabMint(address _to, uint112 _amount) external {
     _transferBalance(msg.sender, address(0), _to, _amount);
@@ -297,7 +297,7 @@ contract TwabController {
    * @dev Note that if the provided user to burn from is delegating that the delegate's
    *      delegateBalance will be updated.
    * @param _from The address to burn balance and delegateBalance from
-   * @param _amount The amount to mint
+   * @param _amount The amount to burn
    */
   function twabBurn(address _from, uint112 _amount) external {
     _transferBalance(msg.sender, _from, address(0), _amount);
@@ -309,7 +309,7 @@ contract TwabController {
    *      delegateBalance will be updated.
    * @param _from The address to transfer the balance and delegateBalance from
    * @param _to The address to transfer balance and delegateBalance to
-   * @param _amount THe amount to mint
+   * @param _amount The amount to transfer
    */
   function twabTransfer(address _from, address _to, uint112 _amount) external {
     _transferBalance(msg.sender, _from, _to, _amount);
@@ -339,7 +339,7 @@ contract TwabController {
   /**
    * @notice Transfers a user's vault balance from one address to another.
    * @dev If the user is delegating, their delegate's delegateBalance is also updated.
-   * * @dev If we are minting or burning tokens then the total supply is also updated.
+   * @dev If we are minting or burning tokens then the total supply is also updated.
    * @param _vault the vault for which the balance is being transferred
    * @param _from the address from which the balance is being transferred
    * @param _to the address to which the balance is being transferred
@@ -458,22 +458,22 @@ contract TwabController {
    *          balance to the delegate's delegateBalance.
    * @param _vault The vault for which the delegate is being set
    * @param _from the address to delegate from
-   * @param _toDelegate the address to delegate to
+   * @param _to the address to delegate to
    */
-  function _delegate(address _vault, address _from, address _toDelegate) internal {
+  function _delegate(address _vault, address _from, address _to) internal {
     address _currentDelegate = _delegateOf(_vault, _from);
-    require(_toDelegate != _currentDelegate, "TC/delegate-already-set");
+    require(_to != _currentDelegate, "TC/delegate-already-set");
 
-    delegates[_vault][_from] = _toDelegate;
+    delegates[_vault][_from] = _to;
 
     _transferDelegateBalance(
       _vault,
       _currentDelegate,
-      _toDelegate,
+      _to,
       userTwabs[_vault][_from].details.balance
     );
 
-    emit Delegated(_vault, _from, _toDelegate);
+    emit Delegated(_vault, _from, _to);
   }
 
   /**
@@ -503,7 +503,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Decreases the totalSupply balance and delegateBalance for a specific vault.
+   * @notice Decreases the a user's balance and delegateBalance for a specific vault.
    * @param _vault the vault for which the totalSupply balance is being decreased
    * @param _amount the amount of balance being decreased
    * @param _delegateAmount the amount of delegateBalance being decreased
