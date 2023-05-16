@@ -6,24 +6,15 @@ import { console2 } from "forge-std/console2.sol";
 import { BaseSetup } from "test/utils/BaseSetup.sol";
 import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
 import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
+import { ObservationLibMock } from "test/contracts/mocks/ObservationLibMock.sol";
 
 contract ObservationLibTest is BaseSetup {
-  ObservationLib.Observation[MAX_CARDINALITY] observations;
+  ObservationLibMock public observationLibMock;
 
-  /* ============ helpers ============ */
+  function setUp() public override {
+    super.setUp();
 
-  /**
-   *
-   * @param _timestamps the timestamps to create
-   */
-  function populateObservations(uint32[] memory _timestamps) public {
-    for (uint i; i < _timestamps.length; i++) {
-      observations[RingBufferLib.wrap(i, MAX_CARDINALITY)] = ObservationLib.Observation({
-        timestamp: _timestamps[i],
-        balance: 0,
-        cumulativeBalance: 0
-      });
-    }
+    observationLibMock = new ObservationLibMock();
   }
 
   /* ============ binarySearch ============ */
@@ -36,7 +27,7 @@ contract ObservationLibTest is BaseSetup {
     t[3] = 4;
     t[4] = 5;
     t[5] = 6;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 5;
     uint24 oldestObservationIndex = 0;
     uint32 target = 3;
@@ -46,8 +37,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -67,7 +57,7 @@ contract ObservationLibTest is BaseSetup {
     t[3] = 4;
     t[4] = 5;
     t[5] = 6;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 5;
     uint24 oldestObservationIndex = 0;
     uint32 target = 4;
@@ -77,8 +67,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -94,15 +83,14 @@ contract ObservationLibTest is BaseSetup {
   function testFailBinarySearch_OneItem_TargetBefore() public {
     uint32[] memory t = new uint32[](1);
     t[0] = 10;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 0;
     uint24 oldestObservationIndex = 0;
     uint32 target = 5;
     uint16 cardinality = uint16(t.length);
     uint32 time = 100;
 
-    ObservationLib.binarySearch(
-      observations,
+    observationLibMock.binarySearch(
       newestObservationIndex,
       oldestObservationIndex,
       target,
@@ -114,7 +102,7 @@ contract ObservationLibTest is BaseSetup {
   function testBinarySearch_OneItem_TargetExact() public {
     uint32[] memory t = new uint32[](1);
     t[0] = 10;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 0;
     uint24 oldestObservationIndex = 0;
     uint32 target = 10;
@@ -124,8 +112,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -141,15 +128,14 @@ contract ObservationLibTest is BaseSetup {
   function testFailBinarySearch_OneItem_TargetAfter() public {
     uint32[] memory t = new uint32[](1);
     t[0] = 10;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 0;
     uint24 oldestObservationIndex = 0;
     uint32 target = 15;
     uint16 cardinality = uint16(t.length);
     uint32 time = 100;
 
-    ObservationLib.binarySearch(
-      observations,
+    observationLibMock.binarySearch(
       newestObservationIndex,
       oldestObservationIndex,
       target,
@@ -162,7 +148,7 @@ contract ObservationLibTest is BaseSetup {
     uint32[] memory t = new uint32[](2);
     t[0] = 10;
     t[1] = 20;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 1;
     uint24 oldestObservationIndex = 0;
     uint32 target = 10;
@@ -172,8 +158,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -189,7 +174,7 @@ contract ObservationLibTest is BaseSetup {
     uint32[] memory t = new uint32[](2);
     t[0] = 10;
     t[1] = 20;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 1;
     uint24 oldestObservationIndex = 0;
     uint32 target = 15;
@@ -199,8 +184,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -216,7 +200,7 @@ contract ObservationLibTest is BaseSetup {
     uint32[] memory t = new uint32[](2);
     t[0] = 10;
     t[1] = 20;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 1;
     uint24 oldestObservationIndex = 0;
     uint32 target = 20;
@@ -226,8 +210,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -244,7 +227,7 @@ contract ObservationLibTest is BaseSetup {
     t[0] = 10;
     t[1] = 20;
     t[2] = 30;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 2;
     uint24 oldestObservationIndex = 0;
     uint32 target = 10;
@@ -254,8 +237,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -272,7 +254,7 @@ contract ObservationLibTest is BaseSetup {
     t[0] = 10;
     t[1] = 20;
     t[2] = 30;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 2;
     uint24 oldestObservationIndex = 0;
     uint32 target = 20;
@@ -282,8 +264,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
@@ -300,7 +281,7 @@ contract ObservationLibTest is BaseSetup {
     t[0] = 10;
     t[1] = 20;
     t[2] = 30;
-    populateObservations(t);
+    observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 2;
     uint24 oldestObservationIndex = 0;
     uint32 target = 30;
@@ -310,8 +291,7 @@ contract ObservationLibTest is BaseSetup {
     (
       ObservationLib.Observation memory beforeOrAt,
       ObservationLib.Observation memory afterOrAt
-    ) = ObservationLib.binarySearch(
-        observations,
+    ) = observationLibMock.binarySearch(
         newestObservationIndex,
         oldestObservationIndex,
         target,
