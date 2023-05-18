@@ -82,15 +82,15 @@ library ObservationLib {
 
       afterOrAt = _observations[uint16(RingBufferLib.nextIndex(currentIndex, _cardinality))];
 
-      bool targetafterOrAt = beforeOrAtTimestamp.lte(_target, _time);
+      bool targetAfterOrAt = beforeOrAtTimestamp.lte(_target, _time);
 
       // Check if we've found the corresponding Observation.
-      if (targetafterOrAt && _target.lte(afterOrAt.timestamp, _time)) {
+      if (targetAfterOrAt && _target.lte(afterOrAt.timestamp, _time)) {
         break;
       }
 
       // If `beforeOrAtTimestamp` is greater than `_target`, then we keep searching lower. To the left of the current index.
-      if (!targetafterOrAt) {
+      if (!targetAfterOrAt) {
         rightSide = currentIndex - 1;
       } else {
         // Otherwise, we keep searching higher. To the left of the current index.

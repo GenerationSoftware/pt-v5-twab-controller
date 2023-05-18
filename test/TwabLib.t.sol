@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 import { BaseSetup } from "test/utils/BaseSetup.sol";
 import { TwabLib } from "src/libraries/TwabLib.sol";
-import { TwabLibMock } from "test/contracts/mocks/TwabLibMock.sol";
+import { TwabLibMock } from "test/mocks/TwabLibMock.sol";
 import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
 
 contract TwabLibTest is BaseSetup {

@@ -207,7 +207,7 @@ library TwabLib {
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails
   ) internal view returns (uint16 index, ObservationLib.Observation memory observation) {
-    // If the TWAB is not initialized we go to the beginning of the TWAB circular buffer at index 0
+    // If the circular buffer has not been fully populated, we go to the beginning of the buffer at index 0.
     if (_accountDetails.cardinality < MAX_CARDINALITY) {
       index = 0;
       observation = _observations[0];
@@ -356,7 +356,7 @@ library TwabLib {
       );
     }
 
-    // Otherwise, we're overwriting the current newest Obsercation
+    // Otherwise, we're overwriting the current newest Observation
     return (newestIndex, newestObservation, false);
   }
 
@@ -518,7 +518,6 @@ library TwabLib {
     uint32 currentTime = uint32(block.timestamp);
 
     uint16 oldestTwabIndex;
-    uint16 newestTwabIndex;
 
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
@@ -550,12 +549,12 @@ library TwabLib {
     }
 
     // Find the newest observation and check if the target time is AFTER it
-    (newestTwabIndex, nextOrNewestObservation) = getNewestObservation(
-      _observations,
-      _accountDetails
-    );
-    if (_targetTime >= nextOrNewestObservation.timestamp) {
-      return nextOrNewestObservation;
+    (
+      uint16 newestTwabIndex,
+      ObservationLib.Observation memory newestObservation
+    ) = getNewestObservation(_observations, _accountDetails);
+    if (_targetTime >= newestObservation.timestamp) {
+      return newestObservation;
     }
 
     ObservationLib.Observation memory beforeOrAt;
@@ -573,7 +572,6 @@ library TwabLib {
       return beforeOrAt;
     }
 
-    // Double check if the Observation is the newest one.
     return nextOrNewestObservation;
   }
 

@@ -32,8 +32,8 @@ contract TwabControllerTest is BaseSetup {
   event ObservationRecorded(
     address indexed vault,
     address indexed user,
-    uint96 amount,
-    uint96 delegateAmount,
+    uint112 balance,
+    uint112 delegateBalance,
     bool isNew,
     ObservationLib.Observation observation
   );
@@ -46,8 +46,8 @@ contract TwabControllerTest is BaseSetup {
 
   event TotalSupplyObservationRecorded(
     address indexed vault,
-    uint96 amount,
-    uint96 delegateAmount,
+    uint112 balance,
+    uint112 delegateBalance,
     bool isNew,
     ObservationLib.Observation observation
   );
@@ -482,8 +482,8 @@ contract TwabControllerTest is BaseSetup {
     emit ObservationRecorded(
       mockVault,
       alice,
-      _amount,
-      _amount,
+      0,
+      0,
       false,
       ObservationLib.Observation({
         balance: 0,
@@ -498,8 +498,8 @@ contract TwabControllerTest is BaseSetup {
     vm.expectEmit(true, false, false, true);
     emit TotalSupplyObservationRecorded(
       mockVault,
-      _amount,
-      _amount,
+      0,
+      0,
       false,
       ObservationLib.Observation({
         balance: 0,
@@ -563,8 +563,8 @@ contract TwabControllerTest is BaseSetup {
     emit ObservationRecorded(
       mockVault,
       alice,
-      _amount,
-      _amount,
+      0,
+      0,
       false,
       ObservationLib.Observation({
         balance: 0,
@@ -579,8 +579,8 @@ contract TwabControllerTest is BaseSetup {
     vm.expectEmit(true, false, false, true);
     emit TotalSupplyObservationRecorded(
       mockVault,
-      _amount,
-      _amount,
+      0,
+      0,
       false,
       ObservationLib.Observation({
         balance: 0,
