@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { console2 } from "forge-std/console2.sol";
-
-import { BaseSetup } from "test/utils/BaseSetup.sol";
+import { BaseTest } from "test/utils/BaseTest.sol";
 import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
 import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
 import { ObservationLibMock } from "test/mocks/ObservationLibMock.sol";
 
-contract ObservationLibTest is BaseSetup {
+contract ObservationLibTest is BaseTest {
   ObservationLibMock public observationLibMock;
 
   function setUp() public override {

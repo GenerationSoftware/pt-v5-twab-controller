@@ -121,6 +121,7 @@ library TwabLib {
       // Write to storage
       _account.observations[index] = observation;
     }
+
     // Write to storage
     _account.details = accountDetails;
   }
@@ -237,7 +238,7 @@ library TwabLib {
   /**
    * @notice Looks up a users balance at a specific time in the past.
    * @dev If the time is not an exact match of an observation, the balance is extrapolated using the previous observation.
-   * @dev Ensure timestamps are safe using isTimeSafe.
+   * @dev Ensure timestamps are safe using isTimeSafe or by ensuring you're querying a multiple of the observation period intervals.
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @param _targetTime The time to look up the balance at
@@ -347,8 +348,10 @@ library TwabLib {
     uint32 currentPeriod = _getTimestampPeriod(currentTime);
     uint32 newestObservationPeriod = _getTimestampPeriod(newestObservation.timestamp);
 
+    // TODO: Could skip this check for period 0 if we're sure that the PERIOD_OFFSET is in the past.
     // Create a new Observation if the current time falls within a new period
-    if (currentPeriod > newestObservationPeriod) {
+    // Or if the timestamp is the initial period.
+    if (currentPeriod == 0 || currentPeriod > newestObservationPeriod) {
       return (
         uint16(RingBufferLib.wrap(_accountDetails.nextObservationIndex, MAX_CARDINALITY)),
         newestObservation,
@@ -373,7 +376,7 @@ library TwabLib {
     // new cumulative balance = provided cumulative balance (or zero) + (current balance * elapsed seconds)
     return
       _observation.cumulativeBalance +
-      _observation.balance *
+      uint128(_observation.balance) *
       (_timestamp.checkedSub(_observation.timestamp, _timestamp));
   }
 
@@ -389,15 +392,18 @@ library TwabLib {
 
   /**
    * @notice Calculates the period a timestamp falls within.
-   * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0.
+   * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0. PERIOD_OFFSET + 1 seconds is the start of period 1.
+   * @dev All timestamps landing on multiples of PERIOD_LENGTH are the ends of periods.
    * @param _timestamp The timestamp to calculate the period for
    * @return period The period
    */
   function _getTimestampPeriod(uint32 _timestamp) private pure returns (uint32 period) {
-    if (_timestamp < PERIOD_OFFSET) {
+    if (_timestamp <= PERIOD_OFFSET) {
       return 0;
     }
-    return ((_timestamp - PERIOD_OFFSET) / PERIOD_LENGTH) + 1;
+    // Shrink by 1 to ensure periods end on a multiple of PERIOD_LENGTH.
+    // Increase by 1 to start periods at # 1.
+    return ((_timestamp - PERIOD_OFFSET - 1) / PERIOD_LENGTH) + 1;
   }
 
   /**
@@ -639,8 +645,13 @@ library TwabLib {
       return false;
     }
     // If there is one observation, compare it's timestamp
+    uint32 period = _getTimestampPeriod(_time);
+
     if (_accountDetails.cardinality == 1) {
-      return _time >= _observations[0].timestamp;
+      return
+        period != _getTimestampPeriod(_observations[0].timestamp)
+          ? true
+          : _time >= _observations[0].timestamp;
     }
     ObservationLib.Observation memory preOrAtObservation;
     ObservationLib.Observation memory nextOrNewestObservation;
@@ -657,7 +668,6 @@ library TwabLib {
       _time
     );
 
-    uint32 period = _getTimestampPeriod(_time);
     uint32 preOrAtPeriod = _getTimestampPeriod(preOrAtObservation.timestamp);
     uint32 postPeriod = _getTimestampPeriod(nextOrNewestObservation.timestamp);
 
