@@ -35,10 +35,10 @@ contract BaseSetup is Test {
     vm.label(dave, "Dave");
   }
 
-  function logObservations(TwabLib.Account memory account, uint256 amount) internal {
+  function logObservations(TwabLib.Account memory account, uint256 amount) internal view {
     for (uint256 i = 0; i < amount; i++) {
-      ObservationLib.Observation memory observation = account.twabs[i];
-      console.log("Observation: ", i, observation.amount, observation.timestamp);
+      ObservationLib.Observation memory observation = account.observations[i];
+      console.log("Observation: ", i, observation.cumulativeBalance, observation.timestamp);
     }
     console.log("--");
   }

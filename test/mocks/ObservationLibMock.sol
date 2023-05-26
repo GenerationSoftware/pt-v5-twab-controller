@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: GPL-3.0
+
+pragma solidity 0.8.17;
+
+import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
+
+import { TwabLib } from "src/libraries/TwabLib.sol";
+import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
+
+contract ObservationLibMock {
+  ObservationLib.Observation[MAX_CARDINALITY] observations;
+
+  /**
+   * Fills a ring buffer with observations
+   * @param _timestamps the timestamps to create
+   */
+  function populateObservations(uint32[] memory _timestamps) public {
+    for (uint i; i < _timestamps.length; i++) {
+      observations[RingBufferLib.wrap(i, MAX_CARDINALITY)] = ObservationLib.Observation({
+        timestamp: _timestamps[i],
+        balance: 0,
+        cumulativeBalance: 0
+      });
+    }
+  }
+
+  /**
+   * @notice Fetches Observations `beforeOrAt` and `afterOrAt` a `_target`, eg: where [`beforeOrAt`, `afterOrAt`] is satisfied.
+   * The result may be the same Observation, or adjacent Observations.
+   * @param _newestObservationIndex Index of the newest Observation. Right side of the circular buffer.
+   * @param _oldestObservationIndex Index of the oldest Observation. Left side of the circular buffer.
+   * @param _target Timestamp at which we are searching the Observation.
+   * @param _cardinality Cardinality of the circular buffer we are searching through.
+   * @param _time Timestamp at which we perform the binary search.
+   * @return Observation recorded before, or at, the target.
+   * @return Observation recorded at, or after, the target.
+   */
+  function binarySearch(
+    uint24 _newestObservationIndex,
+    uint24 _oldestObservationIndex,
+    uint32 _target,
+    uint16 _cardinality,
+    uint32 _time
+  ) external view returns (ObservationLib.Observation memory, ObservationLib.Observation memory) {
+    (
+      ObservationLib.Observation memory beforeOrAt,
+      ObservationLib.Observation memory afterOrAt
+    ) = ObservationLib.binarySearch(
+        observations,
+        _newestObservationIndex,
+        _oldestObservationIndex,
+        _target,
+        _cardinality,
+        _time
+      );
+    return (beforeOrAt, afterOrAt);
+  }
+}
