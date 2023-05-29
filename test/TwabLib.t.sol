@@ -722,7 +722,6 @@ contract TwabLibTest is BaseTest {
     // Get observation at timestamp before first observation
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds);
     assertEq(prevOrAtObservation.timestamp, TwabLib.PERIOD_OFFSET);
-    assertGe(prevOrAtObservation.timestamp, TwabLib.PERIOD_OFFSET);
 
     // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);
@@ -738,7 +737,6 @@ contract TwabLibTest is BaseTest {
     // Get observation at timestamp before first observation
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds);
     assertEq(prevOrAtObservation.timestamp, TwabLib.PERIOD_OFFSET);
-    assertGe(prevOrAtObservation.timestamp, TwabLib.PERIOD_OFFSET);
 
     // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);

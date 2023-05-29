@@ -469,6 +469,36 @@ contract TwabControllerTest is BaseTest {
     vm.stopPrank();
   }
 
+  function testSimpleSponsorshipDelegation() external {
+    assertEq(twabController.totalSupply(mockVault), 0);
+    assertEq(twabController.totalSupplyDelegateBalance(mockVault), 0);
+
+    uint96 _amount = 10;
+
+    vm.startPrank(mockVault);
+    twabController.mint(alice, _amount);
+    twabController.mint(bob, _amount);
+
+    assertEq(twabController.balanceOf(mockVault, alice), _amount);
+    assertEq(twabController.balanceOf(mockVault, bob), _amount);
+    assertEq(twabController.delegateBalanceOf(mockVault, alice), _amount);
+    assertEq(twabController.delegateBalanceOf(mockVault, bob), _amount);
+    assertEq(twabController.delegateBalanceOf(mockVault, twabController.SPONSORSHIP_ADDRESS()), 0);
+
+    twabController.sponsor(bob);
+    vm.stopPrank();
+    vm.prank(alice);
+    twabController.delegate(mockVault, bob);
+
+    // Balances stay the same
+    assertEq(twabController.balanceOf(mockVault, alice), _amount);
+    assertEq(twabController.balanceOf(mockVault, bob), _amount);
+    // Delegate balances have changed
+    assertEq(twabController.delegateBalanceOf(mockVault, alice), 0);
+    assertEq(twabController.delegateBalanceOf(mockVault, bob), _amount);
+    assertEq(twabController.delegateBalanceOf(mockVault, twabController.SPONSORSHIP_ADDRESS()), 0);
+  }
+
   function testMint() external {
     uint96 _amount = 1000e18;
     vm.expectEmit(true, true, false, true);
@@ -984,7 +1014,7 @@ contract TwabControllerTest is BaseTest {
     );
     bobTwab = twabController.getTwabBetween(
       mockVault,
-      alice,
+      bob,
       TwabLib.PERIOD_OFFSET,
       newestObservation.timestamp
     );
@@ -994,9 +1024,9 @@ contract TwabControllerTest is BaseTest {
       newestObservation.timestamp
     );
 
-    assertEq(aliceTwab, bobTwab);
+    assertLt(aliceTwab, bobTwab);
     // Sum of Alice and Bob's TWABs should be less than or equal to the total supply TWAB
-    assertLe(aliceTwab + bobTwab, totalSupplyTwab);
+    assertApproxEqAbs(aliceTwab + bobTwab, totalSupplyTwab, 1);
     assertTimeRangeIsSafe(alice, TwabLib.PERIOD_OFFSET, newestObservation.timestamp);
   }
 

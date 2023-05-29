@@ -470,7 +470,7 @@ contract TwabController {
 
       _decreaseBalances(_vault, _from, _amount, _isFromDelegate ? _amount : 0);
 
-      // If the user is not delegating to themself, increase the delegate's delegateBalance
+      // If the user is not delegating to themself, decrease the delegate's delegateBalance
       // If the user is delegating to the sponsorship address, don't adjust the delegateBalance
       if (!_isFromDelegate && _fromDelegate != SPONSORSHIP_ADDRESS) {
         _decreaseBalances(_vault, _fromDelegate, 0, _amount);
@@ -564,7 +564,8 @@ contract TwabController {
     if (_fromDelegate != address(0) && _fromDelegate != SPONSORSHIP_ADDRESS) {
       _decreaseBalances(_vault, _fromDelegate, 0, _amount);
 
-      // burn
+      // If we are delegating to the zero address, decrease total supply
+      // If we are delegating to the sponsorship address, decrease total supply
       if (_toDelegate == address(0) || _toDelegate == SPONSORSHIP_ADDRESS) {
         _decreaseTotalSupplyBalances(_vault, 0, _amount);
       }
@@ -574,7 +575,8 @@ contract TwabController {
     if (_toDelegate != address(0) && _toDelegate != SPONSORSHIP_ADDRESS) {
       _increaseBalances(_vault, _toDelegate, 0, _amount);
 
-      // mint
+      // If we are removing delegation from the zero address, increase total supply
+      // If we are removing delegation from the sponsorship address, increase total supply
       if (_fromDelegate == address(0) || _fromDelegate == SPONSORSHIP_ADDRESS) {
         _increaseTotalSupplyBalances(_vault, 0, _amount);
       }

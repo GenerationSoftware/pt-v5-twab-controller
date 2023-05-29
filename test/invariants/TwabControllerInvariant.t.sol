@@ -61,7 +61,6 @@ contract TwabControllerInvariant is BaseTest, InvariantTest {
     assertEq(totalUsersSupply, handler.h_totalMinted() - handler.h_totalBurned());
 
     assertEq(totalUsersSupply, totalTotalSupply);
-    // assertAlmostEqual(totalUsersSupply, totalTotalSupply, 1);
   }
 
   // Each timestamp of an observation should be safe for both TotalSupply and Actors.
@@ -78,9 +77,8 @@ contract TwabControllerInvariant is BaseTest, InvariantTest {
   function invariant_totalSupplyTwabGreaterThanUserTwabs() public {
     (uint256 totalSupplyTwabSum, uint256 userTwabSum) = handler.reduceFullRangeTwabs();
 
-    // NOTE: Users odds will be squished and the full odds space won't be allocated.abi
+    // NOTE: This is not an exact check because the total supply TWAB may be slightly higher than the sum of user TWABs due to rounding.
     assertLe(userTwabSum, totalSupplyTwabSum);
+    assertApproxEqAbs(userTwabSum, totalSupplyTwabSum, 100);
   }
-
-  /* ============ Helpers ============ */
 }

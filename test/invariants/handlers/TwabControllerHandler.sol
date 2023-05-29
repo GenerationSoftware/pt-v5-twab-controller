@@ -148,7 +148,6 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
     currentActor = random(actors, actorSeed);
     _addrs.addActor(currentVault, currentActor);
     _;
-    removeCurrentActorIfEmpty();
   }
 
   modifier useVaultAndActorWithBalance(uint256 vaultSeed, uint256 actorSeed) {
@@ -158,16 +157,9 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
 
     require(twabController.balanceOf(currentVault, currentActor) > 0, "Actor has no balance");
     _;
-    removeCurrentActorIfEmpty();
   }
 
   /* ============ Helper Functions ============ */
-
-  function removeCurrentActorIfEmpty() internal {
-    if (twabController.balanceOf(currentVault, currentActor) == 0) {
-      _addrs.removeActor(currentVault, currentActor);
-    }
-  }
 
   function random(address[] memory addresses, uint256 seed) public pure returns (address) {
     return addresses[seed % addresses.length];
