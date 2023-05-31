@@ -316,6 +316,15 @@ contract TwabController {
   }
 
   /**
+   * @notice Calculates the period a timestamp falls into.
+   * @param time The timestamp to check
+   * @return period The period the timestamp falls into
+   */
+  function getTimestampPeriod(uint32 time) external pure returns (uint32) {
+    return TwabLib.getTimestampPeriod(time);
+  }
+
+  /**
    * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
    * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
    * @dev If the time being queried is in a period that has not yet ended, the output for this function may change.
@@ -346,6 +355,37 @@ contract TwabController {
     uint32 endTime
   ) external view returns (bool) {
     TwabLib.Account storage account = userObservations[vault][user];
+    return TwabLib.isTimeRangeSafe(account.observations, account.details, startTime, endTime);
+  }
+
+  /**
+   * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
+   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
+   * @dev If the time being queried is in a period that has not yet ended, the output for this function may change.
+   * @param vault The vault to check
+   * @param time The timestamp to check
+   * @return isSafe Whether or not the timestamp is safe
+   */
+  function isTotalSupplyTimeSafe(address vault, uint32 time) external view returns (bool) {
+    TwabLib.Account storage account = totalSupplyObservations[vault];
+    return TwabLib.isTimeSafe(account.observations, account.details, time);
+  }
+
+  /**
+   * @notice Checks if the given time range is safe to perform a historic balance lookup on.
+   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
+   * @dev If the endtime being queried is in a period that has not yet ended, the output for this function may change.
+   * @param vault The vault to check
+   * @param startTime The start of the timerange to check
+   * @param endTime The end of the timerange to check
+   * @return isSafe Whether or not the time range is safe
+   */
+  function isTotalSupplyTimeRangeSafe(
+    address vault,
+    uint32 startTime,
+    uint32 endTime
+  ) external view returns (bool) {
+    TwabLib.Account storage account = totalSupplyObservations[vault];
     return TwabLib.isTimeRangeSafe(account.observations, account.details, startTime, endTime);
   }
 
@@ -423,48 +463,64 @@ contract TwabController {
     }
 
     // If we are transferring tokens from a delegated account to an undelegated account
+    address _fromDelegate = _delegateOf(_vault, _from);
+    address _toDelegate = _delegateOf(_vault, _to);
     if (_from != address(0)) {
-      address _fromDelegate = _delegateOf(_vault, _from);
       bool _isFromDelegate = _fromDelegate == _from;
 
       _decreaseBalances(_vault, _from, _amount, _isFromDelegate ? _amount : 0);
 
-      if (!_isFromDelegate) {
-        _decreaseBalances(
-          _vault,
-          _fromDelegate,
-          0,
-          _fromDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
-        );
+      // If the user is not delegating to themself, decrease the delegate's delegateBalance
+      // If the user is delegating to the sponsorship address, don't adjust the delegateBalance
+      if (!_isFromDelegate && _fromDelegate != SPONSORSHIP_ADDRESS) {
+        _decreaseBalances(_vault, _fromDelegate, 0, _amount);
       }
 
-      // burn
-      if (_to == address(0)) {
+      // Burn balance if we're transferring to address(0)
+      // Burn delegateBalance if we're transferring to address(0) and burning from an address that is not delegating to the sponsorship address
+      // Burn delegateBalance if we're transferring to an address delegating to the sponsorship address from an address that isn't delegating to the sponsorship address
+      if (
+        _to == address(0) ||
+        (_toDelegate == SPONSORSHIP_ADDRESS && _fromDelegate != SPONSORSHIP_ADDRESS)
+      ) {
+        // If the user is delegating to the sponsorship address, don't adjust the total supply delegateBalance
         _decreaseTotalSupplyBalances(
           _vault,
-          _amount,
-          _fromDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+          _to == address(0) ? _amount : 0,
+          (_to == address(0) && _fromDelegate != SPONSORSHIP_ADDRESS) ||
+            (_toDelegate == SPONSORSHIP_ADDRESS && _fromDelegate != SPONSORSHIP_ADDRESS)
+            ? _amount
+            : 0
         );
       }
     }
 
-    // If we are transferring tokens from an undelegated account to a delegated account
+    // If we are transferring tokens to an address other than address(0)
     if (_to != address(0)) {
-      address _toDelegate = _delegateOf(_vault, _to);
       bool _isToDelegate = _toDelegate == _to;
 
+      // If the user is delegating to themself, increase their delegateBalance
       _increaseBalances(_vault, _to, _amount, _isToDelegate ? _amount : 0);
 
-      if (!_isToDelegate) {
-        _increaseBalances(_vault, _toDelegate, 0, _toDelegate != SPONSORSHIP_ADDRESS ? _amount : 0);
+      // Otherwise, increase their delegates delegateBalance if it is not the sponsorship address
+      if (!_isToDelegate && _toDelegate != SPONSORSHIP_ADDRESS) {
+        _increaseBalances(_vault, _toDelegate, 0, _amount);
       }
 
-      // mint
-      if (_from == address(0)) {
+      // Mint balance if we're transferring from address(0)
+      // Mint delegateBalance if we're transferring from address(0) and to an address not delegating to the sponsorship address
+      // Mint delegateBalance if we're transferring from an address delegating to the sponsorship address to an address that isn't delegating to the sponsorship address
+      if (
+        _from == address(0) ||
+        (_fromDelegate == SPONSORSHIP_ADDRESS && _toDelegate != SPONSORSHIP_ADDRESS)
+      ) {
         _increaseTotalSupplyBalances(
           _vault,
-          _amount,
-          _toDelegate != SPONSORSHIP_ADDRESS ? _amount : 0
+          _from == address(0) ? _amount : 0,
+          (_from == address(0) && _toDelegate != SPONSORSHIP_ADDRESS) ||
+            (_fromDelegate == SPONSORSHIP_ADDRESS && _toDelegate != SPONSORSHIP_ADDRESS)
+            ? _amount
+            : 0
         );
       }
     }
@@ -508,7 +564,8 @@ contract TwabController {
     if (_fromDelegate != address(0) && _fromDelegate != SPONSORSHIP_ADDRESS) {
       _decreaseBalances(_vault, _fromDelegate, 0, _amount);
 
-      // burn
+      // If we are delegating to the zero address, decrease total supply
+      // If we are delegating to the sponsorship address, decrease total supply
       if (_toDelegate == address(0) || _toDelegate == SPONSORSHIP_ADDRESS) {
         _decreaseTotalSupplyBalances(_vault, 0, _amount);
       }
@@ -518,7 +575,8 @@ contract TwabController {
     if (_toDelegate != address(0) && _toDelegate != SPONSORSHIP_ADDRESS) {
       _increaseBalances(_vault, _toDelegate, 0, _amount);
 
-      // mint
+      // If we are removing delegation from the zero address, increase total supply
+      // If we are removing delegation from the sponsorship address, increase total supply
       if (_fromDelegate == address(0) || _fromDelegate == SPONSORSHIP_ADDRESS) {
         _increaseTotalSupplyBalances(_vault, 0, _amount);
       }

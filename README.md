@@ -80,6 +80,10 @@ npm run format
 npm run hint
 ```
 
+### Tests
+
+Test names including `SLOW` will be skipped on default test runs and need to be explicitly run.
+
 ### CI
 
 A default Github Actions workflow is setup to execute on push and pull request.
