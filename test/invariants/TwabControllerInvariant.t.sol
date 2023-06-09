@@ -16,14 +16,16 @@ import { TwabControllerHandler } from "./handlers/TwabControllerHandler.sol";
 contract TwabControllerInvariant is BaseTest, InvariantTest {
   TwabController public twabController;
   TwabControllerHandler public handler;
+  uint32 public constant PERIOD_OFFSET = 10 days;
+  uint32 public constant PERIOD_LENGTH = 1 days;
 
   function setUp() public override {
     super.setUp();
 
     // Ensure the time in our test environment is >= the defined period offset.
-    vm.warp(TwabLib.PERIOD_OFFSET);
+    vm.warp(PERIOD_OFFSET);
 
-    twabController = new TwabController();
+    twabController = new TwabController(PERIOD_LENGTH, PERIOD_OFFSET);
     handler = new TwabControllerHandler(twabController);
 
     // Restrict handler methods to be called

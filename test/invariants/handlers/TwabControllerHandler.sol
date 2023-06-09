@@ -14,7 +14,8 @@ import { VaultAddressSet, VaultAddressSetLib } from "../helpers/VaultAddressSet.
 
 contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
   using VaultAddressSetLib for VaultAddressSet;
-
+  uint32 public constant PERIOD_OFFSET = 10 days;
+  uint32 public constant PERIOD_LENGTH = 1 days;
   mapping(string => uint256) public h_fnCallCount;
 
   Utils public utils = new Utils();
@@ -31,7 +32,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
   uint256 public h_totalMinted;
   uint256 public h_totalBurned;
   uint256 public h_initialBlockTimestamp = block.timestamp;
-  uint256 public h_blockTimestamp = TwabLib.PERIOD_OFFSET;
+  uint256 public h_blockTimestamp = PERIOD_OFFSET;
   uint256 public h_blockTimestampChanges;
   mapping(address => ObservationLib.Observation) public h_oldestObservationPerVault;
   mapping(address => ObservationLib.Observation) public h_newestObservationPerVault;
@@ -172,7 +173,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
    */
   function timeTravel(uint256 numSeconds) public {
     // Bound the time travel to a reasonable amount.
-    uint256 time = bound(numSeconds, 0, 24 * TwabLib.PERIOD_LENGTH);
+    uint256 time = bound(numSeconds, 0, 24 * PERIOD_LENGTH);
     h_blockTimestamp += time;
     vm.warp(h_blockTimestamp);
 
@@ -285,7 +286,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         // Check if each period end timestamp is safe for this vault
         uint32 newestPeriod = twabController.getTimestampPeriod(newestObservation.timestamp);
         for (uint32 p_i = 1; p_i < newestPeriod; ++p_i) {
-          uint32 timestamp = TwabLib.PERIOD_OFFSET + (p_i * TwabLib.PERIOD_LENGTH);
+          uint32 timestamp = PERIOD_OFFSET + (p_i * PERIOD_LENGTH);
           isVaultsSafe = isVaultsSafe && twabController.isTotalSupplyTimeSafe(vault, timestamp);
         }
 
@@ -314,7 +315,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
             // Check if each period end timestamp is safe for this actor
             newestPeriod = twabController.getTimestampPeriod(newestObservation.timestamp);
             for (uint32 p_i = 1; p_i <= newestPeriod; ++p_i) {
-              uint32 timestamp = TwabLib.PERIOD_OFFSET + (p_i * TwabLib.PERIOD_LENGTH);
+              uint32 timestamp = PERIOD_OFFSET + (p_i * PERIOD_LENGTH);
               twabController.getTimestampPeriod(timestamp);
               isVaultsSafe = isVaultsSafe && twabController.isTimeSafe(vault, actor, timestamp);
             }
@@ -355,11 +356,11 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         }
 
         // If there's no range to query across, skip
-        if (newestObservation.timestamp > TwabLib.PERIOD_OFFSET) {
+        if (newestObservation.timestamp > PERIOD_OFFSET) {
           // Add TWAB between time start and newest observation for that vault's total supply
           vaultAcc += twabController.getTotalSupplyTwabBetween(
             vault,
-            TwabLib.PERIOD_OFFSET,
+            PERIOD_OFFSET,
             newestObservation.timestamp
           );
 
@@ -371,7 +372,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
               actorAcc += twabController.getTwabBetween(
                 vault,
                 _addrs.actors[vault][j],
-                TwabLib.PERIOD_OFFSET,
+                PERIOD_OFFSET,
                 newestObservation.timestamp
               );
             }

@@ -7,6 +7,8 @@ import { ObservationLib } from "src/libraries/ObservationLib.sol";
 
 contract TwabLibMock {
   uint16 public constant MAX_CARDINALITY = 365;
+  uint32 PERIOD_LENGTH = 1 days;
+  uint32 PERIOD_OFFSET = 10 days;
   using TwabLib for ObservationLib.Observation[MAX_CARDINALITY];
   TwabLib.Account public account;
 
@@ -18,7 +20,7 @@ contract TwabLibMock {
       ObservationLib.Observation memory observation,
       bool isNewObservation,
       bool isObservationRecorded
-    ) = TwabLib.increaseBalances(account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, account, _amount, _delegateAmount);
 
     return (observation, isNewObservation, isObservationRecorded);
   }
@@ -32,13 +34,21 @@ contract TwabLibMock {
       ObservationLib.Observation memory observation,
       bool isNewObservation,
       bool isObservationRecorded
-    ) = TwabLib.decreaseBalances(account, _amount, _delegateAmount, _revertMessage);
+    ) = TwabLib.decreaseBalances(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
+        account,
+        _amount,
+        _delegateAmount,
+        _revertMessage
+      );
 
     return (observation, isNewObservation, isObservationRecorded);
   }
 
   function getTwabBetween(uint32 _startTime, uint32 _endTime) external view returns (uint256) {
     uint256 averageBalance = TwabLib.getTwabBetween(
+      PERIOD_OFFSET,
       account.observations,
       account.details,
       _startTime,
@@ -51,6 +61,7 @@ contract TwabLibMock {
     uint32 _targetTime
   ) external view returns (ObservationLib.Observation memory) {
     ObservationLib.Observation memory prevOrAtObservation = TwabLib.getPreviousOrAtObservation(
+      PERIOD_OFFSET,
       account.observations,
       account.details,
       _targetTime
@@ -62,6 +73,7 @@ contract TwabLibMock {
     uint32 _targetTime
   ) external view returns (ObservationLib.Observation memory) {
     ObservationLib.Observation memory nextOrNewestObservation = TwabLib.getNextOrNewestObservation(
+      PERIOD_OFFSET,
       account.observations,
       account.details,
       _targetTime
@@ -94,7 +106,12 @@ contract TwabLibMock {
   }
 
   function getBalanceAt(uint32 _targetTime) external view returns (uint256) {
-    uint256 balance = TwabLib.getBalanceAt(account.observations, account.details, _targetTime);
+    uint256 balance = TwabLib.getBalanceAt(
+      PERIOD_OFFSET,
+      account.observations,
+      account.details,
+      _targetTime
+    );
     return balance;
   }
 
@@ -106,13 +123,19 @@ contract TwabLibMock {
     return account.details;
   }
 
-  function getTimestampPeriod(uint32 _timestamp) external pure returns (uint32) {
-    uint32 timestamp = TwabLib.getTimestampPeriod(_timestamp);
+  function getTimestampPeriod(uint32 _timestamp) external view returns (uint32) {
+    uint32 timestamp = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
     return timestamp;
   }
 
   function isTimeSafe(uint32 _timestamp) external view returns (bool) {
-    bool isSafe = TwabLib.isTimeSafe(account.observations, account.details, _timestamp);
+    bool isSafe = TwabLib.isTimeSafe(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      account.observations,
+      account.details,
+      _timestamp
+    );
     return isSafe;
   }
 
@@ -121,6 +144,8 @@ contract TwabLibMock {
     uint32 _endTimestamp
   ) external view returns (bool) {
     bool isSafe = TwabLib.isTimeRangeSafe(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
       account.observations,
       account.details,
       _startTimestamp,

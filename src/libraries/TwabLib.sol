@@ -22,19 +22,6 @@ import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
  *         within safe boundaries.
  */
 library TwabLib {
-  /**
-   * @dev Sets the minimum period length for Observations. When a period elapses, a new Observation
-   *      is recorded, otherwise the most recent Observation is updated.
-   */
-  uint32 constant PERIOD_LENGTH = 1 days;
-
-  /**
-   * @dev Sets the beginning timestamp for the first period. This allows us to maximize storage as well
-   *      as line up periods with a chosen timestamp.
-   * @dev Ensure this date is in the past, otherwise underflows will occur whilst calculating periods.
-   */
-  uint32 constant PERIOD_OFFSET = 1683486000; // 2023-09-05 06:00:00 UTC
-
   using OverflowSafeComparatorLib for uint32;
 
   /**
@@ -73,6 +60,8 @@ library TwabLib {
    * @return isObservationRecorded Whether or not the observation was recorded to storage
    */
   function increaseBalances(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     Account storage _account,
     uint96 _amount,
     uint96 _delegateAmount
@@ -92,6 +81,8 @@ library TwabLib {
     // Only record a new Observation if the users delegateBalance has changed.
     if (isObservationRecorded) {
       (index, newestObservation, isNew) = _getNextObservationIndex(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
         _account.observations,
         accountDetails
       );
@@ -138,6 +129,8 @@ library TwabLib {
    * @return isObservationRecorded Whether or not the observation was recorded to storage
    */
   function decreaseBalances(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     Account storage _account,
     uint96 _amount,
     uint96 _delegateAmount,
@@ -164,6 +157,8 @@ library TwabLib {
     // Only record a new Observation if the users delegateBalance has changed.
     if (isObservationRecorded) {
       (index, newestObservation, isNew) = _getNextObservationIndex(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
         _account.observations,
         accountDetails
       );
@@ -245,11 +240,13 @@ library TwabLib {
    * @return balance The balance at the target time
    */
   function getBalanceAt(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) internal view returns (uint256) {
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
+      PERIOD_OFFSET,
       _observations,
       _accountDetails,
       _targetTime
@@ -268,18 +265,21 @@ library TwabLib {
    * @return twab The TWAB for the time range
    */
   function getTwabBetween(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
     uint32 _endTime
   ) internal view returns (uint256) {
     ObservationLib.Observation memory startObservation = _getPreviousOrAtObservation(
+      PERIOD_OFFSET,
       _observations,
       _accountDetails,
       _startTime
     );
 
     ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
+      PERIOD_OFFSET,
       _observations,
       _accountDetails,
       _endTime
@@ -329,6 +329,8 @@ library TwabLib {
    * @return isNew Whether or not the observation is new
    */
   function _getNextObservationIndex(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails
   )
@@ -345,8 +347,12 @@ library TwabLib {
       return (newestIndex, newestObservation, false);
     }
 
-    uint32 currentPeriod = _getTimestampPeriod(currentTime);
-    uint32 newestObservationPeriod = _getTimestampPeriod(newestObservation.timestamp);
+    uint32 currentPeriod = _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, currentTime);
+    uint32 newestObservationPeriod = _getTimestampPeriod(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      newestObservation.timestamp
+    );
 
     // TODO: Could skip this check for period 0 if we're sure that the PERIOD_OFFSET is in the past.
     // Create a new Observation if the current time falls within a new period
@@ -383,21 +389,33 @@ library TwabLib {
   /**
    * @notice Calculates the period a timestamp falls within.
    * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0.
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
    * @param _timestamp The timestamp to calculate the period for
    * @return period The period
    */
-  function getTimestampPeriod(uint32 _timestamp) internal pure returns (uint32 period) {
-    return _getTimestampPeriod(_timestamp);
+  function getTimestampPeriod(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _timestamp
+  ) internal pure returns (uint32 period) {
+    return _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
   }
 
   /**
    * @notice Calculates the period a timestamp falls within.
    * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0. PERIOD_OFFSET + 1 seconds is the start of period 1.
    * @dev All timestamps landing on multiples of PERIOD_LENGTH are the ends of periods.
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
    * @param _timestamp The timestamp to calculate the period for
    * @return period The period
    */
-  function _getTimestampPeriod(uint32 _timestamp) private pure returns (uint32 period) {
+  function _getTimestampPeriod(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _timestamp
+  ) private pure returns (uint32 period) {
     if (_timestamp <= PERIOD_OFFSET) {
       return 0;
     }
@@ -415,11 +433,12 @@ library TwabLib {
    * @return prevOrAtObservation The observation
    */
   function getPreviousOrAtObservation(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) internal view returns (ObservationLib.Observation memory prevOrAtObservation) {
-    return _getPreviousOrAtObservation(_observations, _accountDetails, _targetTime);
+    return _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _targetTime);
   }
 
   /**
@@ -431,6 +450,7 @@ library TwabLib {
    * @return prevOrAtObservation The observation
    */
   function _getPreviousOrAtObservation(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
@@ -501,11 +521,12 @@ library TwabLib {
    * @return nextOrNewestObservation The observation
    */
   function getNextOrNewestObservation(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) internal view returns (ObservationLib.Observation memory nextOrNewestObservation) {
-    return _getNextOrNewestObservation(_observations, _accountDetails, _targetTime);
+    return _getNextOrNewestObservation(PERIOD_OFFSET, _observations, _accountDetails, _targetTime);
   }
 
   /**
@@ -517,6 +538,7 @@ library TwabLib {
    * @return nextOrNewestObservation The observation
    */
   function _getNextOrNewestObservation(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
@@ -590,6 +612,7 @@ library TwabLib {
    * @return nextOrNewestObservation The observation after the timestamp or the newest observation.
    */
   function _getSurroundingOrAtObservations(
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
@@ -601,8 +624,14 @@ library TwabLib {
       ObservationLib.Observation memory nextOrNewestObservation
     )
   {
-    prevOrAtObservation = _getPreviousOrAtObservation(_observations, _accountDetails, _targetTime);
+    prevOrAtObservation = _getPreviousOrAtObservation(
+      PERIOD_OFFSET,
+      _observations,
+      _accountDetails,
+      _targetTime
+    );
     nextOrNewestObservation = _getNextOrNewestObservation(
+      PERIOD_OFFSET,
       _observations,
       _accountDetails,
       _targetTime
@@ -619,11 +648,13 @@ library TwabLib {
    * @return isSafe Whether or not the timestamp is safe
    */
   function isTimeSafe(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _time
   ) internal view returns (bool) {
-    return _isTimeSafe(_observations, _accountDetails, _time);
+    return _isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, _observations, _accountDetails, _time);
   }
 
   /**
@@ -636,6 +667,8 @@ library TwabLib {
    * @return isSafe Whether or not the timestamp is safe
    */
   function _isTimeSafe(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _time
@@ -645,11 +678,11 @@ library TwabLib {
       return false;
     }
     // If there is one observation, compare it's timestamp
-    uint32 period = _getTimestampPeriod(_time);
+    uint32 period = _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _time);
 
     if (_accountDetails.cardinality == 1) {
       return
-        period != _getTimestampPeriod(_observations[0].timestamp)
+        period != _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _observations[0].timestamp)
           ? true
           : _time >= _observations[0].timestamp;
     }
@@ -663,13 +696,22 @@ library TwabLib {
     }
 
     (preOrAtObservation, nextOrNewestObservation) = _getSurroundingOrAtObservations(
+      PERIOD_OFFSET,
       _observations,
       _accountDetails,
       _time
     );
 
-    uint32 preOrAtPeriod = _getTimestampPeriod(preOrAtObservation.timestamp);
-    uint32 postPeriod = _getTimestampPeriod(nextOrNewestObservation.timestamp);
+    uint32 preOrAtPeriod = _getTimestampPeriod(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      preOrAtObservation.timestamp
+    );
+    uint32 postPeriod = _getTimestampPeriod(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      nextOrNewestObservation.timestamp
+    );
 
     // The observation after it falls in a new period
     return period >= preOrAtPeriod && period < postPeriod;
@@ -686,13 +728,15 @@ library TwabLib {
    * @return isSafe Whether or not the time range is safe
    */
   function isTimeRangeSafe(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
     uint32 _endTime
   ) internal view returns (bool) {
     return
-      _isTimeSafe(_observations, _accountDetails, _startTime) &&
-      _isTimeSafe(_observations, _accountDetails, _endTime);
+      _isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, _observations, _accountDetails, _startTime) &&
+      _isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, _observations, _accountDetails, _endTime);
   }
 }
