@@ -22,6 +22,13 @@ contract TwabController {
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
   address public constant SPONSORSHIP_ADDRESS = address(1);
 
+  /// @notice Sets the minimum period length for Observations. When a period elapses, a new Observation is recorded, otherwise the most recent Observation is updated.
+  uint32 public immutable PERIOD_LENGTH;
+
+  /// @notice Sets the beginning timestamp for the first period. This allows us to maximize storage as well as line up periods with a chosen timestamp.
+  /// @dev Ensure that the PERIOD_OFFSET is in the past.
+  uint32 public immutable PERIOD_OFFSET;
+
   /* ============ State ============ */
 
   /// @notice Record of token holders TWABs for each account for each vault
@@ -121,6 +128,21 @@ contract TwabController {
     ObservationLib.Observation observation
   );
 
+  /* ============ Constructor ============ */
+
+  /**
+   * @notice Construct a new TwabController.
+   * @dev Ensure the periods offset is in the past, otherwise underflows will occur whilst calculating periods.
+   * @param _periodLength Sets the minimum period length for Observations. When a period elapses, a new Observation
+   *      is recorded, otherwise the most recent Observation is updated.
+   * @param _periodOffset Sets the beginning timestamp for the first period. This allows us to maximize storage as well
+   *      as line up periods with a chosen timestamp.
+   */
+  constructor(uint32 _periodLength, uint32 _periodOffset) {
+    PERIOD_LENGTH = _periodLength;
+    PERIOD_OFFSET = _periodOffset;
+  }
+
   /* ============ External Read Functions ============ */
 
   /**
@@ -209,7 +231,7 @@ contract TwabController {
     uint32 targetTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    return TwabLib.getBalanceAt(_account.observations, _account.details, targetTime);
+    return TwabLib.getBalanceAt(PERIOD_OFFSET, _account.observations, _account.details, targetTime);
   }
 
   /**
@@ -220,7 +242,7 @@ contract TwabController {
    */
   function getTotalSupplyAt(address vault, uint32 targetTime) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    return TwabLib.getBalanceAt(_account.observations, _account.details, targetTime);
+    return TwabLib.getBalanceAt(PERIOD_OFFSET, _account.observations, _account.details, targetTime);
   }
 
   /**
@@ -239,7 +261,14 @@ contract TwabController {
     uint32 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    return TwabLib.getTwabBetween(_account.observations, _account.details, startTime, endTime);
+    return
+      TwabLib.getTwabBetween(
+        PERIOD_OFFSET,
+        _account.observations,
+        _account.details,
+        startTime,
+        endTime
+      );
   }
 
   /**
@@ -256,7 +285,14 @@ contract TwabController {
     uint32 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    return TwabLib.getTwabBetween(_account.observations, _account.details, startTime, endTime);
+    return
+      TwabLib.getTwabBetween(
+        PERIOD_OFFSET,
+        _account.observations,
+        _account.details,
+        startTime,
+        endTime
+      );
   }
 
   /**
@@ -320,8 +356,8 @@ contract TwabController {
    * @param time The timestamp to check
    * @return period The period the timestamp falls into
    */
-  function getTimestampPeriod(uint32 time) external pure returns (uint32) {
-    return TwabLib.getTimestampPeriod(time);
+  function getTimestampPeriod(uint32 time) external view returns (uint32) {
+    return TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, time);
   }
 
   /**
@@ -335,7 +371,8 @@ contract TwabController {
    */
   function isTimeSafe(address vault, address user, uint32 time) external view returns (bool) {
     TwabLib.Account storage account = userObservations[vault][user];
-    return TwabLib.isTimeSafe(account.observations, account.details, time);
+    return
+      TwabLib.isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, account.observations, account.details, time);
   }
 
   /**
@@ -355,7 +392,15 @@ contract TwabController {
     uint32 endTime
   ) external view returns (bool) {
     TwabLib.Account storage account = userObservations[vault][user];
-    return TwabLib.isTimeRangeSafe(account.observations, account.details, startTime, endTime);
+    return
+      TwabLib.isTimeRangeSafe(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
+        account.observations,
+        account.details,
+        startTime,
+        endTime
+      );
   }
 
   /**
@@ -368,7 +413,8 @@ contract TwabController {
    */
   function isTotalSupplyTimeSafe(address vault, uint32 time) external view returns (bool) {
     TwabLib.Account storage account = totalSupplyObservations[vault];
-    return TwabLib.isTimeSafe(account.observations, account.details, time);
+    return
+      TwabLib.isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, account.observations, account.details, time);
   }
 
   /**
@@ -386,7 +432,15 @@ contract TwabController {
     uint32 endTime
   ) external view returns (bool) {
     TwabLib.Account storage account = totalSupplyObservations[vault];
-    return TwabLib.isTimeRangeSafe(account.observations, account.details, startTime, endTime);
+    return
+      TwabLib.isTimeRangeSafe(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
+        account.observations,
+        account.details,
+        startTime,
+        endTime
+      );
   }
 
   /* ============ External Write Functions ============ */
@@ -625,7 +679,7 @@ contract TwabController {
       ObservationLib.Observation memory _observation,
       bool _isNewObservation,
       bool _isObservationRecorded
-    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, _account, _amount, _delegateAmount);
 
     // Always emit the balance change event
     emit IncreasedBalance(_vault, _user, _amount, _delegateAmount);
@@ -662,6 +716,8 @@ contract TwabController {
       bool _isNewObservation,
       bool _isObservationRecorded
     ) = TwabLib.decreaseBalances(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
         _account,
         _amount,
         _delegateAmount,
@@ -702,6 +758,8 @@ contract TwabController {
       bool _isNewObservation,
       bool _isObservationRecorded
     ) = TwabLib.decreaseBalances(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
         _account,
         _amount,
         _delegateAmount,
@@ -740,7 +798,7 @@ contract TwabController {
       ObservationLib.Observation memory _observation,
       bool _isNewObservation,
       bool _isObservationRecorded
-    ) = TwabLib.increaseBalances(_account, _amount, _delegateAmount);
+    ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, _account, _amount, _delegateAmount);
 
     // Always emit the balance change event
     emit IncreasedTotalSupply(_vault, _amount, _delegateAmount);

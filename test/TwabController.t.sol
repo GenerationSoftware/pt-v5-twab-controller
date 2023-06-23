@@ -14,6 +14,8 @@ contract TwabControllerTest is BaseTest {
   address public mockVault = address(0x1234);
   ERC20 public token;
   uint16 public constant MAX_CARDINALITY = 365;
+  uint32 public constant PERIOD_LENGTH = 1 days;
+  uint32 public constant PERIOD_OFFSET = 10 days;
 
   event IncreasedBalance(
     address indexed vault,
@@ -55,11 +57,11 @@ contract TwabControllerTest is BaseTest {
   function setUp() public override {
     super.setUp();
 
-    twabController = new TwabController();
+    twabController = new TwabController(PERIOD_LENGTH, PERIOD_OFFSET);
     token = new ERC20("Test", "TST");
 
     // Ensure time is >= the hardcoded offset.
-    vm.warp(TwabLib.PERIOD_OFFSET);
+    vm.warp(PERIOD_OFFSET);
   }
 
   function testGetAccount() external {
@@ -95,41 +97,30 @@ contract TwabControllerTest is BaseTest {
     // Before history started
     assertEq(twabController.getBalanceAt(mockVault, alice, 0), 0);
     // At history start
-    assertEq(twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET), 0);
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), 0);
 
     // Mint at history start
     uint96 _amount = 1000e18;
     twabController.mint(alice, _amount);
 
     // Half way through a period.
-    vm.warp(TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2));
-    assertEq(twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET), _amount);
+    vm.warp(PERIOD_OFFSET + (PERIOD_LENGTH / 2));
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), _amount);
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + 10 seconds), _amount);
     assertEq(
-      twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET + 10 seconds),
+      twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + (PERIOD_LENGTH / 2)),
       _amount
     );
     assertEq(
       twabController.getBalanceAt(
         mockVault,
         alice,
-        TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2)
+        PERIOD_OFFSET + (PERIOD_LENGTH / 2) + 10 seconds
       ),
       _amount
     );
     assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        alice,
-        TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2) + 10 seconds
-      ),
-      _amount
-    );
-    assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        alice,
-        TwabLib.PERIOD_OFFSET + ((TwabLib.PERIOD_LENGTH / 4) * 3)
-      ),
+      twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + ((PERIOD_LENGTH / 4) * 3)),
       _amount
     );
 
@@ -138,69 +129,47 @@ contract TwabControllerTest is BaseTest {
 
     // Recheck the last set of timestamps.
     // Balances will have changed due to overwrites.
-    assertEq(twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET), _amount);
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), _amount);
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + 10 seconds), _amount);
     assertEq(
-      twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET + 10 seconds),
-      _amount
-    );
-    assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        alice,
-        TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2)
-      ),
+      twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + (PERIOD_LENGTH / 2)),
       _amount * 2
     );
     assertEq(
       twabController.getBalanceAt(
         mockVault,
         alice,
-        TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2) + 10 seconds
+        PERIOD_OFFSET + (PERIOD_LENGTH / 2) + 10 seconds
       ),
       _amount * 2
     );
     assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        alice,
-        TwabLib.PERIOD_OFFSET + ((TwabLib.PERIOD_LENGTH / 4) * 3)
-      ),
+      twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + ((PERIOD_LENGTH / 4) * 3)),
       _amount * 2
     );
 
     // 3 quarters of the way through the period, transfer half the balance.
-    vm.warp(TwabLib.PERIOD_OFFSET + ((TwabLib.PERIOD_LENGTH / 4) * 3));
+    vm.warp(PERIOD_OFFSET + ((PERIOD_LENGTH / 4) * 3));
     twabController.transfer(alice, bob, _amount);
 
     // Recheck the last set of timestamps.
     // Balances will have changed due to overwrites.
-    assertEq(twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET), _amount);
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), _amount);
+    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + 10 seconds), _amount);
     assertEq(
-      twabController.getBalanceAt(mockVault, alice, TwabLib.PERIOD_OFFSET + 10 seconds),
+      twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + (PERIOD_LENGTH / 2)),
       _amount
     );
     assertEq(
       twabController.getBalanceAt(
         mockVault,
         alice,
-        TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2)
+        PERIOD_OFFSET + (PERIOD_LENGTH / 2) + 10 seconds
       ),
       _amount
     );
     assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        alice,
-        TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2) + 10 seconds
-      ),
-      _amount
-    );
-    assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        alice,
-        TwabLib.PERIOD_OFFSET + ((TwabLib.PERIOD_LENGTH / 4) * 3)
-      ),
+      twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET + ((PERIOD_LENGTH / 4) * 3)),
       _amount
     );
 
@@ -209,16 +178,12 @@ contract TwabControllerTest is BaseTest {
       twabController.getBalanceAt(
         mockVault,
         bob,
-        TwabLib.PERIOD_OFFSET + ((TwabLib.PERIOD_LENGTH / 4) * 3) - 1 seconds
+        PERIOD_OFFSET + ((PERIOD_LENGTH / 4) * 3) - 1 seconds
       ),
       0
     );
     assertEq(
-      twabController.getBalanceAt(
-        mockVault,
-        bob,
-        TwabLib.PERIOD_OFFSET + ((TwabLib.PERIOD_LENGTH / 4) * 3)
-      ),
+      twabController.getBalanceAt(mockVault, bob, PERIOD_OFFSET + ((PERIOD_LENGTH / 4) * 3)),
       _amount
     );
 
@@ -226,8 +191,8 @@ contract TwabControllerTest is BaseTest {
   }
 
   function testGetTwabBetween() external {
-    uint32 initialTimestamp = TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH;
-    uint32 currentTimestamp = initialTimestamp + TwabLib.PERIOD_LENGTH;
+    uint32 initialTimestamp = PERIOD_OFFSET + PERIOD_LENGTH;
+    uint32 currentTimestamp = initialTimestamp + PERIOD_LENGTH;
 
     vm.warp(initialTimestamp);
 
@@ -390,10 +355,10 @@ contract TwabControllerTest is BaseTest {
     uint256 totalSupplyTwab;
     uint256 bobTwab;
     uint96 amount = 100e18;
-    uint32 t0 = TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH / 2);
-    uint32 t1 = t0 + TwabLib.PERIOD_LENGTH;
-    uint32 t2 = t1 + TwabLib.PERIOD_LENGTH;
-    uint32 t3 = t2 + TwabLib.PERIOD_LENGTH;
+    uint32 t0 = PERIOD_OFFSET + (PERIOD_LENGTH / 2);
+    uint32 t1 = t0 + PERIOD_LENGTH;
+    uint32 t2 = t1 + PERIOD_LENGTH;
+    uint32 t3 = t2 + PERIOD_LENGTH;
 
     vm.startPrank(mockVault);
     vm.warp(t0);
@@ -849,10 +814,10 @@ contract TwabControllerTest is BaseTest {
 
   function testOverwriteObservations_HappyPath() external {
     uint96 amount = 1e18;
-    uint32 periodTenth = TwabLib.PERIOD_LENGTH / 10;
-    uint32 t0 = TwabLib.PERIOD_OFFSET;
-    uint32 t1 = TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH;
-    uint32 t2 = TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH * 2;
+    uint32 periodTenth = PERIOD_LENGTH / 10;
+    uint32 t0 = PERIOD_OFFSET;
+    uint32 t1 = PERIOD_OFFSET + PERIOD_LENGTH;
+    uint32 t2 = PERIOD_OFFSET + PERIOD_LENGTH * 2;
     ObservationInfo[] memory testObservations = new ObservationInfo[](8);
     testObservations[0] = ObservationInfo(t0, amount, 0);
     testObservations[1] = ObservationInfo(t0 + periodTenth, amount, 1);
@@ -867,10 +832,10 @@ contract TwabControllerTest is BaseTest {
 
   function testOverwriteObservations_LongPeriodBetween() external {
     uint96 amount = 1e18;
-    uint32 periodTenth = TwabLib.PERIOD_LENGTH / 10;
-    uint32 t0 = TwabLib.PERIOD_OFFSET;
-    uint32 t1 = TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH;
-    uint32 t2 = TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH * 42);
+    uint32 periodTenth = PERIOD_LENGTH / 10;
+    uint32 t0 = PERIOD_OFFSET;
+    uint32 t1 = PERIOD_OFFSET + PERIOD_LENGTH;
+    uint32 t2 = PERIOD_OFFSET + (PERIOD_LENGTH * 42);
     ObservationInfo[] memory testObservations = new ObservationInfo[](7);
     testObservations[0] = ObservationInfo(t0, amount, 0);
     testObservations[1] = ObservationInfo(t0 + periodTenth, amount, 1);
@@ -884,10 +849,10 @@ contract TwabControllerTest is BaseTest {
 
   function testOverwriteObservations_FullStateCheck() external {
     uint96 amount = 1e18;
-    uint32 periodTenth = TwabLib.PERIOD_LENGTH / 10;
-    uint32 t0 = TwabLib.PERIOD_OFFSET;
-    uint32 t1 = TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH;
-    uint32 t2 = TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH * 2);
+    uint32 periodTenth = PERIOD_LENGTH / 10;
+    uint32 t0 = PERIOD_OFFSET;
+    uint32 t1 = PERIOD_OFFSET + PERIOD_LENGTH;
+    uint32 t2 = PERIOD_OFFSET + (PERIOD_LENGTH * 2);
     ObservationInfo[] memory testObservations = new ObservationInfo[](5);
     testObservations[0] = ObservationInfo(t0, amount, 0);
     testObservations[1] = ObservationInfo(t1, amount, 1);
@@ -931,26 +896,23 @@ contract TwabControllerTest is BaseTest {
     uint96 _amount = 1000e18;
 
     // Wrap around the TWAB storage
-    uint32 t = TwabLib.PERIOD_OFFSET;
+    uint32 t = PERIOD_OFFSET;
     for (uint256 i = 0; i <= MAX_CARDINALITY; i++) {
       vm.warp(t);
       twabController.mint(alice, _amount);
-      t += TwabLib.PERIOD_LENGTH;
+      t += PERIOD_LENGTH;
     }
 
     (newestIndex, newestObservation) = twabController.getNewestObservation(mockVault, alice);
 
     assertEq(newestObservation.cumulativeBalance, 5771088000000e18);
-    assertEq(
-      newestObservation.timestamp,
-      TwabLib.PERIOD_OFFSET + (TwabLib.PERIOD_LENGTH * (MAX_CARDINALITY))
-    );
+    assertEq(newestObservation.timestamp, PERIOD_OFFSET + (PERIOD_LENGTH * (MAX_CARDINALITY)));
     assertEq(newestIndex, 0);
 
     (oldestIndex, oldestObservation) = twabController.getOldestObservation(mockVault, alice);
 
     assertEq(oldestObservation.cumulativeBalance, 86400000e18);
-    assertEq(oldestObservation.timestamp, TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH);
+    assertEq(oldestObservation.timestamp, PERIOD_OFFSET + PERIOD_LENGTH);
     assertEq(oldestIndex, 1);
 
     uint256 aliceTwab = twabController.getTwabBetween(
@@ -976,9 +938,9 @@ contract TwabControllerTest is BaseTest {
 
     twabController.mint(alice, _amount);
     twabController.mint(bob, _amount);
-    utils.timeTravel(TwabLib.PERIOD_LENGTH);
+    utils.timeTravel(PERIOD_LENGTH);
     twabController.transfer(alice, bob, _amount / 2);
-    utils.timeTravel(TwabLib.PERIOD_LENGTH / 2);
+    utils.timeTravel(PERIOD_LENGTH / 2);
     twabController.mint(alice, _amount);
     twabController.mint(bob, _amount);
 
@@ -1009,25 +971,25 @@ contract TwabControllerTest is BaseTest {
     aliceTwab = twabController.getTwabBetween(
       mockVault,
       alice,
-      TwabLib.PERIOD_OFFSET,
+      PERIOD_OFFSET,
       newestObservation.timestamp
     );
     bobTwab = twabController.getTwabBetween(
       mockVault,
       bob,
-      TwabLib.PERIOD_OFFSET,
+      PERIOD_OFFSET,
       newestObservation.timestamp
     );
     totalSupplyTwab = twabController.getTotalSupplyTwabBetween(
       mockVault,
-      TwabLib.PERIOD_OFFSET,
+      PERIOD_OFFSET,
       newestObservation.timestamp
     );
 
     assertLt(aliceTwab, bobTwab);
     // Sum of Alice and Bob's TWABs should be less than or equal to the total supply TWAB
     assertApproxEqAbs(aliceTwab + bobTwab, totalSupplyTwab, 1);
-    assertTimeRangeIsSafe(alice, TwabLib.PERIOD_OFFSET, newestObservation.timestamp);
+    assertTimeRangeIsSafe(alice, PERIOD_OFFSET, newestObservation.timestamp);
   }
 
   function assertTimeRangeIsSafe(address user, uint32 start, uint32 end) internal {
@@ -1039,8 +1001,8 @@ contract TwabControllerTest is BaseTest {
 
   function testFlashLoanMitigation() external {
     uint96 largeAmount = 1000000e18;
-    uint32 drawStart = TwabLib.PERIOD_OFFSET;
-    uint32 drawEnd = drawStart + (TwabLib.PERIOD_LENGTH * 24); // Assume 24 periods in a day for testing purposes.
+    uint32 drawStart = PERIOD_OFFSET;
+    uint32 drawEnd = drawStart + (PERIOD_LENGTH * 24); // Assume 24 periods in a day for testing purposes.
 
     // Store actual balance during draw N at the end of draw N+1
     vm.warp(drawEnd + 1 seconds);
@@ -1068,8 +1030,8 @@ contract TwabControllerTest is BaseTest {
 
   function testImmediateWithdrawalMitigation() external {
     uint96 largeAmount = 1000000e18;
-    uint32 drawStart = TwabLib.PERIOD_OFFSET + TwabLib.PERIOD_LENGTH; // Offset draws and periods by 1 to ensure hardcoded value is safe.
-    uint32 drawEnd = drawStart + (TwabLib.PERIOD_LENGTH * 24); // Assume 24 periods in a day for testing purposes.
+    uint32 drawStart = PERIOD_OFFSET + PERIOD_LENGTH; // Offset draws and periods by 1 to ensure hardcoded value is safe.
+    uint32 drawEnd = drawStart + (PERIOD_LENGTH * 24); // Assume 24 periods in a day for testing purposes.
 
     // Deposit immediately before draw start
     mintAndValidate(mockVault, alice, ObservationInfo(drawStart - 1 seconds, largeAmount, 0));
