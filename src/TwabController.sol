@@ -6,6 +6,9 @@ import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { TwabLib } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";
 
+/// @notice Emitted when an account already points to the same delegate address that is being set
+error SameDelegateAlreadySet(address delegate);
+
 /**
  * @title  PoolTogether V5 TwabController
  * @author PoolTogether Inc Team
@@ -646,7 +649,9 @@ contract TwabController {
    */
   function _delegate(address _vault, address _from, address _to) internal {
     address _currentDelegate = _delegateOf(_vault, _from);
-    require(_to != _currentDelegate, "TC/delegate-already-set");
+    if (_to == _currentDelegate) {
+      revert SameDelegateAlreadySet(_to);
+    }
 
     delegates[_vault][_from] = _to;
 

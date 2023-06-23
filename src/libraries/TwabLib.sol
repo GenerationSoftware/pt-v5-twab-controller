@@ -7,6 +7,18 @@ import "ring-buffer-lib/RingBufferLib.sol";
 import "./OverflowSafeComparatorLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
 
+/// @notice Emitted when a balance is decreased by an amount that exceeds the amount available
+/// @param balance The current balance of the account
+/// @param amount The amount being decreased from the account's balance
+/// @param message An additional message describing the error
+error BalanceLTAmount(uint112 balance, uint96 amount, string message);
+
+/// @notice Emitted when a delegate balance is decreased by an amount that exceeds the amount available
+/// @param delegateBalance The current delegate balance of the account
+/// @param delegateAmount The amount being decreased from the account's delegate balance
+/// @param message An additional message describing the error
+error DelegateBalanceLTAmount(uint112 delegateBalance, uint96 delegateAmount, string message);
+
 /**
  * @title  PoolTogether V5 TwabLib (Library)
  * @author PoolTogether Inc Team
@@ -141,8 +153,16 @@ library TwabLib {
   {
     AccountDetails memory accountDetails = _account.details;
 
-    require(accountDetails.balance >= _amount, _revertMessage);
-    require(accountDetails.delegateBalance >= _delegateAmount, _revertMessage);
+    if (accountDetails.balance < _amount) {
+      revert BalanceLTAmount(accountDetails.balance, _amount, _revertMessage);
+    }
+    if (accountDetails.delegateBalance < _delegateAmount) {
+      revert DelegateBalanceLTAmount(
+        accountDetails.delegateBalance,
+        _delegateAmount,
+        _revertMessage
+      );
+    }
 
     uint32 currentTime = uint32(block.timestamp);
     uint32 index;

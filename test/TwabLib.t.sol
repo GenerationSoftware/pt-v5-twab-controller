@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 import { console2 } from "forge-std/console2.sol";
 
 import { BaseTest } from "test/utils/BaseTest.sol";
-import { TwabLib } from "src/libraries/TwabLib.sol";
+import { TwabLib, BalanceLTAmount, DelegateBalanceLTAmount } from "src/libraries/TwabLib.sol";
 import { TwabLibMock } from "test/mocks/TwabLibMock.sol";
 import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
 
@@ -247,7 +247,9 @@ contract TwabLibTest is BaseTest {
     vm.warp(_secondTimestamp);
 
     // Decrease more than current balance available
-    vm.expectRevert(bytes("Revert message"));
+    vm.expectRevert(
+      abi.encodeWithSelector(BalanceLTAmount.selector, 0, _amount + 1, "Revert message")
+    );
     (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
       _amount + 1,
       0,
@@ -255,7 +257,14 @@ contract TwabLibTest is BaseTest {
     );
 
     // Decrease more than current delegateBalance available
-    vm.expectRevert(bytes("Revert message"));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        DelegateBalanceLTAmount.selector,
+        _amount,
+        _amount + 1,
+        "Revert message"
+      )
+    );
     (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
       0,
       _amount + 1,
