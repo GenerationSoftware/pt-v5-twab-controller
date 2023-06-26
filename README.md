@@ -1,16 +1,31 @@
-# Foundry template
+<p align="center">
+  <a href="https://github.com/pooltogether/pooltogether--brand-assets">
+    <img src="https://github.com/pooltogether/pooltogether--brand-assets/blob/977e03604c49c63314450b5d432fe57d34747c66/logo/pooltogether-logo--purple-gradient.png?raw=true" alt="PoolTogether Brand" style="max-width:100%;" width="400">
+  </a>
+</p>
 
-Template to kickstart a Foundry project.
+# PoolTogether V5 TWAB Controller
 
-## Getting started
+[![Code Coverage](https://github.com/pooltogether/v5-twab-controller/actions/workflows/coverage.yml/badge.svg)](https://github.com/pooltogether/v5-twab-controller/actions/workflows/coverage.yml)
+[![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
+[![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
 
-The easiest way to get started is by clicking the [Use this template](https://github.com/pooltogether/foundry-template/generate) button at the top right of this page.
+<strong>Have questions or want the latest news?</strong>
+<br/>Join the PoolTogether Discord or follow us on Twitter:
 
-If you prefer to go the CLI way:
+[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://pooltogether.com/discord)
+[![Twitter](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/PoolTogether_)
 
-```
-forge init my-project --template https://github.com/pooltogether/foundry-template
-```
+## Overview
+
+The Time-Weighted Average Balance (TWAB) Controller is a system that keeps track of users token balances, their historic balances and their average balances of historic time periods. It is calculated by looking at the balances held during a queried time period, weighting them based on the duration they were held and returning an average amount held for the whole time period.
+
+This ability to look back in time is critically important for PoolTogether, so that users can deposit and withdraw freely into a prize pool while having their liquidity contribution measured perfectly.
+
+For example:
+
+- If a user held 100 tokens for 1 week, then their average balance over that time was 100.
+- If instead they held 100 for half of the week and then 200 for the second half, then their average for the week would be 150.
 
 ## Development
 
