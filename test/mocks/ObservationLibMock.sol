@@ -25,6 +25,18 @@ contract ObservationLibMock {
   }
 
   /**
+   * Populates an index in the observarions Ring Buffer
+   * @param index the index to update
+   * @param observation the data to store
+   */
+  function updateObservation(
+    uint256 index,
+    ObservationLib.Observation memory observation
+  ) external {
+    observations[index] = observation;
+  }
+
+  /**
    * @notice Fetches Observations `beforeOrAt` and `afterOrAt` a `_target`, eg: where [`beforeOrAt`, `afterOrAt`] is satisfied.
    * The result may be the same Observation, or adjacent Observations.
    * @param _newestObservationIndex Index of the newest Observation. Right side of the circular buffer.

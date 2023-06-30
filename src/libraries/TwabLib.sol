@@ -7,13 +7,13 @@ import "ring-buffer-lib/RingBufferLib.sol";
 import "./OverflowSafeComparatorLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
 
-/// @notice Emitted when a balance is decreased by an amount that exceeds the amount available
+/// @notice Emitted when a balance is decreased by an amount that exceeds the amount available.
 /// @param balance The current balance of the account
 /// @param amount The amount being decreased from the account's balance
 /// @param message An additional message describing the error
 error BalanceLTAmount(uint112 balance, uint96 amount, string message);
 
-/// @notice Emitted when a delegate balance is decreased by an amount that exceeds the amount available
+/// @notice Emitted when a delegate balance is decreased by an amount that exceeds the amount available.
 /// @param delegateBalance The current delegate balance of the account
 /// @param delegateAmount The amount being decreased from the account's delegate balance
 /// @param message An additional message describing the error
@@ -582,18 +582,10 @@ library TwabLib {
       return nextOrNewestObservation;
     }
 
-    // If there is only 1 actual observation, either return that observation or a zeroed observation
+    // If there is only 1 observation and the time is at or after (checked above), return a zeroed observation
     if (_accountDetails.cardinality == 1) {
-      if (_targetTime < nextOrNewestObservation.timestamp) {
-        return nextOrNewestObservation;
-      } else {
-        return
-          ObservationLib.Observation({
-            cumulativeBalance: 0,
-            balance: 0,
-            timestamp: PERIOD_OFFSET
-          });
-      }
+      return
+        ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
     }
 
     // Find the newest observation and check if the target time is AFTER it

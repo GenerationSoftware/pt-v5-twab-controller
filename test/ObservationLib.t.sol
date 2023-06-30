@@ -28,9 +28,52 @@ contract ObservationLibTest is BaseTest {
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 5;
     uint24 oldestObservationIndex = 0;
-    uint32 target = 3;
     uint16 cardinality = uint16(t.length);
     uint32 time = 100;
+
+    // Left side
+    (
+      ObservationLib.Observation memory beforeOrAt,
+      ObservationLib.Observation memory afterOrAt
+    ) = observationLibMock.binarySearch(
+        newestObservationIndex,
+        oldestObservationIndex,
+        2,
+        cardinality,
+        time
+      );
+
+    assertEq(beforeOrAt.timestamp, 1);
+    assertEq(afterOrAt.timestamp, 2);
+
+    // Right side
+    (beforeOrAt, afterOrAt) = observationLibMock.binarySearch(
+      newestObservationIndex,
+      oldestObservationIndex,
+      5,
+      cardinality,
+      time
+    );
+
+    assertEq(beforeOrAt.timestamp, 5);
+    assertEq(afterOrAt.timestamp, 6);
+  }
+
+  function testBinarySearch_beforeOrAtIsZero() public {
+    observationLibMock.updateObservation(
+      2,
+      ObservationLib.Observation({ timestamp: 10, balance: 0, cumulativeBalance: 0 })
+    );
+    observationLibMock.updateObservation(
+      3,
+      ObservationLib.Observation({ timestamp: 20, balance: 0, cumulativeBalance: 0 })
+    );
+
+    uint24 newestObservationIndex = 3;
+    uint24 oldestObservationIndex = 0;
+    uint32 target = 10;
+    uint16 cardinality = 4;
+    uint32 time = 30;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -44,7 +87,7 @@ contract ObservationLibTest is BaseTest {
       );
 
     assertEq(beforeOrAt.timestamp, target);
-    assertEq(afterOrAt.timestamp, target + 1);
+    assertEq(afterOrAt.timestamp, 20);
   }
 
   function testBinarySearch_HappyPath_afterOrAt() public {

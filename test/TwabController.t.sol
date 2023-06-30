@@ -78,6 +78,20 @@ contract TwabControllerTest is BaseTest {
     }
   }
 
+  function testGetTotalSupplyAccount() external {
+    TwabLib.Account memory account = twabController.getTotalSupplyAccount(mockVault);
+    TwabLib.AccountDetails memory accountDetails = account.details;
+
+    assertEq(accountDetails.balance, 0);
+    assertEq(accountDetails.delegateBalance, 0);
+    assertEq(accountDetails.cardinality, 0);
+
+    for (uint256 i = 0; i < MAX_CARDINALITY; i++) {
+      assertEq(account.observations[i].cumulativeBalance, 0);
+      assertEq(account.observations[i].timestamp, 0);
+    }
+  }
+
   function testBalanceOf() external {
     assertEq(twabController.balanceOf(mockVault, alice), 0);
 
@@ -877,7 +891,7 @@ contract TwabControllerTest is BaseTest {
     assertEq(index, 3);
   }
 
-  function testGetOldestAndNewestTwab() external {
+  function testGetOldestAndNewestObservation() external {
     (uint16 newestIndex, ObservationLib.Observation memory newestObservation) = twabController
       .getNewestObservation(mockVault, alice);
 
@@ -928,6 +942,47 @@ contract TwabControllerTest is BaseTest {
     );
 
     assertEq(aliceTwab, totalSupplyTwab);
+
+    vm.stopPrank();
+  }
+
+  function testGetOldestAndNewestTotalSupplyObservation() external {
+    (uint16 newestIndex, ObservationLib.Observation memory newestObservation) = twabController
+      .getNewestTotalSupplyObservation(mockVault);
+
+    assertEq(newestObservation.cumulativeBalance, 0);
+    assertEq(newestObservation.timestamp, 0);
+    assertEq(newestIndex, MAX_CARDINALITY - 1);
+
+    (uint16 oldestIndex, ObservationLib.Observation memory oldestObservation) = twabController
+      .getOldestTotalSupplyObservation(mockVault);
+
+    assertEq(oldestObservation.cumulativeBalance, 0);
+    assertEq(oldestObservation.timestamp, 0);
+    assertEq(oldestIndex, 0);
+
+    vm.startPrank(mockVault);
+    uint96 _amount = 1000e18;
+
+    // Wrap around the TWAB storage
+    uint32 t = PERIOD_OFFSET;
+    for (uint256 i = 0; i <= MAX_CARDINALITY; i++) {
+      vm.warp(t);
+      twabController.mint(alice, _amount);
+      t += PERIOD_LENGTH;
+    }
+
+    (newestIndex, newestObservation) = twabController.getNewestTotalSupplyObservation(mockVault);
+
+    assertEq(newestObservation.cumulativeBalance, 5771088000000e18);
+    assertEq(newestObservation.timestamp, PERIOD_OFFSET + (PERIOD_LENGTH * (MAX_CARDINALITY)));
+    assertEq(newestIndex, 0);
+
+    (oldestIndex, oldestObservation) = twabController.getOldestObservation(mockVault, alice);
+
+    assertEq(oldestObservation.cumulativeBalance, 86400000e18);
+    assertEq(oldestObservation.timestamp, PERIOD_OFFSET + PERIOD_LENGTH);
+    assertEq(oldestIndex, 1);
 
     vm.stopPrank();
   }
@@ -1056,5 +1111,67 @@ contract TwabControllerTest is BaseTest {
     );
 
     assertEq(manipulatedDrawBalance, actualDrawBalance);
+  }
+
+  /* ============ getTimestampPeriod ============ */
+
+  function testGetTimestampPeriod() public {
+    uint32[4] memory periods;
+    periods[0] = twabController.getTimestampPeriod(PERIOD_OFFSET);
+    periods[1] = twabController.getTimestampPeriod(PERIOD_OFFSET + 1 seconds);
+    periods[2] = twabController.getTimestampPeriod(PERIOD_OFFSET + PERIOD_LENGTH);
+    periods[3] = twabController.getTimestampPeriod(PERIOD_OFFSET + (PERIOD_LENGTH * 2));
+
+    assertEq(periods[0], 0);
+    assertEq(periods[1], 1);
+    assertEq(periods[2], 1);
+    assertEq(periods[3], 2);
+  }
+
+  /* ============ isTimeSafe ============ */
+  function testIsTimeSafe() external {
+    uint96 amount = 1e18;
+    uint32 periodTenth = PERIOD_LENGTH / 10;
+    uint32 t0 = PERIOD_OFFSET;
+    uint32 t1 = PERIOD_OFFSET + PERIOD_LENGTH;
+    uint32 t2 = PERIOD_OFFSET + PERIOD_LENGTH * 2;
+    ObservationInfo[] memory testObservations = new ObservationInfo[](8);
+    testObservations[0] = ObservationInfo(t0, amount, 0);
+    testObservations[1] = ObservationInfo(t0 + periodTenth, amount, 1);
+    testObservations[2] = ObservationInfo(t0 + (periodTenth * 2), amount, 1);
+    testObservations[3] = ObservationInfo(t0 + (periodTenth * 3), amount, 1);
+    testObservations[4] = ObservationInfo(t1, amount, 1);
+    testObservations[5] = ObservationInfo(t1 + periodTenth, amount, 2);
+    testObservations[6] = ObservationInfo(t2, amount, 2);
+    testObservations[7] = ObservationInfo(t2 + periodTenth, amount, 3);
+    mintAndValidateMultiple(mockVault, alice, testObservations);
+
+    // Is the time safe to query
+    assertFalse(twabController.isTimeSafe(mockVault, alice, t0 - 1 seconds));
+    assertTrue(twabController.isTimeSafe(mockVault, alice, t0));
+    assertFalse(twabController.isTimeSafe(mockVault, alice, t0 + 1 seconds));
+    assertFalse(twabController.isTimeSafe(mockVault, alice, t0 + (periodTenth * 3)));
+    assertTrue(twabController.isTimeSafe(mockVault, alice, t1));
+    assertFalse(twabController.isTimeSafe(mockVault, alice, t2 - 1 seconds));
+    assertTrue(twabController.isTimeSafe(mockVault, alice, t2));
+    assertFalse(twabController.isTimeSafe(mockVault, alice, t2 + 1 seconds));
+
+    // Is the time range safe to query
+    assertTrue(twabController.isTimeRangeSafe(mockVault, alice, t0, t1));
+    assertFalse(
+      twabController.isTimeRangeSafe(mockVault, alice, t0 + (periodTenth * 3), t1 + periodTenth)
+    );
+    assertTrue(twabController.isTimeRangeSafe(mockVault, alice, t1, t2));
+    assertTrue(twabController.isTimeRangeSafe(mockVault, alice, t0, t2));
+
+    // Is the time safe to query for the total supply
+    assertFalse(twabController.isTotalSupplyTimeSafe(mockVault, t0 - 1 seconds));
+    assertTrue(twabController.isTotalSupplyTimeSafe(mockVault, t0));
+    assertFalse(twabController.isTotalSupplyTimeSafe(mockVault, t0 + 1 seconds));
+    assertFalse(twabController.isTotalSupplyTimeSafe(mockVault, t0 + (periodTenth * 3)));
+    assertTrue(twabController.isTotalSupplyTimeSafe(mockVault, t1));
+    assertFalse(twabController.isTotalSupplyTimeSafe(mockVault, t2 - 1 seconds));
+    assertTrue(twabController.isTotalSupplyTimeSafe(mockVault, t2));
+    assertFalse(twabController.isTotalSupplyTimeSafe(mockVault, t2 + 1 seconds));
   }
 }

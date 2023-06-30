@@ -10,16 +10,16 @@ import { ObservationLib } from "./libraries/ObservationLib.sol";
 error SameDelegateAlreadySet(address delegate);
 
 /**
- * @title  PoolTogether V5 TwabController
- * @author PoolTogether Inc Team
+ * @title  Time-Weighted Average Balance Controller
+ * @author PoolTogether Inc.
  * @dev    Time-Weighted Average Balance Controller for ERC20 tokens.
  * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical
             lookups to a user(s) time-weighted average balance. Each user is mapped to an
             Account struct containing the TWAB history (ring buffer) and ring buffer parameters.
             Every token.transfer() creates a new TWAB observation. The new TWAB observation is
-            stored in the circular ring buffer, as either a new observation or rewriting a
-            previous observation with new parameters. One observation per day is stored.
-            The TwabLib guarantees minimum 1 year of search history.
+            stored in the circular ring buffer as either a new observation or rewriting a
+            previous observation with new parameters. One observation per period is stored.
+            The TwabLib guarantees minimum 1 year of search history if a period is a day.
  */
 contract TwabController {
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
@@ -34,13 +34,13 @@ contract TwabController {
 
   /* ============ State ============ */
 
-  /// @notice Record of token holders TWABs for each account for each vault
+  /// @notice Record of token holders TWABs for each account for each vault.
   mapping(address => mapping(address => TwabLib.Account)) internal userObservations;
 
   /// @notice Record of tickets total supply and ring buff parameters used for observation.
   mapping(address => TwabLib.Account) internal totalSupplyObservations;
 
-  /// @notice vault => user => delegate
+  /// @notice vault => user => delegate.
   mapping(address => mapping(address => address)) internal delegates;
 
   /* ============ Events ============ */
@@ -149,7 +149,7 @@ contract TwabController {
   /* ============ External Read Functions ============ */
 
   /**
-   * @notice Loads the current TWAB Account data for a specific vault stored for a user
+   * @notice Loads the current TWAB Account data for a specific vault stored for a user.
    * @dev Note this is a very expensive function
    * @param vault the vault for which the data is being queried
    * @param user the user whose data is being queried
@@ -160,7 +160,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Loads the current total supply TWAB Account data for a specific vault
+   * @notice Loads the current total supply TWAB Account data for a specific vault.
    * @dev Note this is a very expensive function
    * @param vault the vault for which the data is being queried
    * @return The current total supply TWAB Account data
@@ -170,7 +170,7 @@ contract TwabController {
   }
 
   /**
-   * @notice The current token balance of a user for a specific vault
+   * @notice The current token balance of a user for a specific vault.
    * @param vault the vault for which the balance is being queried
    * @param user the user whose balance is being queried
    * @return The current token balance of the user
@@ -180,7 +180,7 @@ contract TwabController {
   }
 
   /**
-   * @notice The total supply of tokens for a vault
+   * @notice The total supply of tokens for a vault.
    * @param vault the vault for which the total supply is being queried
    * @return The total supply of tokens for a vault
    */
@@ -201,7 +201,7 @@ contract TwabController {
   }
 
   /**
-   * @notice The current delegate of a user for a specific vault
+   * @notice The current delegate of a user for a specific vault.
    * @param vault the vault for which the delegate balance is being queried
    * @param user the user whose delegate balance is being queried
    * @return The current delegate balance of the user
@@ -211,7 +211,7 @@ contract TwabController {
   }
 
   /**
-   * @notice The current delegateBalance of a user for a specific vault
+   * @notice The current delegateBalance of a user for a specific vault.
    * @dev the delegateBalance is the sum of delegated balance to this user
    * @param vault the vault for which the delegateBalance is being queried
    * @param user the user whose delegateBalance is being queried
@@ -222,7 +222,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up a users balance at a specific time in the past
+   * @notice Looks up a users balance at a specific time in the past.
    * @param vault the vault for which the balance is being queried
    * @param user the user whose balance is being queried
    * @param targetTime the time in the past for which the balance is being queried
@@ -238,7 +238,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the total supply at a specific time in the past
+   * @notice Looks up the total supply at a specific time in the past.
    * @param vault the vault for which the total supply is being queried
    * @param targetTime the time in the past for which the total supply is being queried
    * @return The total supply at the target time
@@ -249,7 +249,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the average balance of a user between two timestamps
+   * @notice Looks up the average balance of a user between two timestamps.
    * @dev Timestamps are Unix timestamps denominated in seconds
    * @param vault the vault for which the average balance is being queried
    * @param user the user whose average balance is being queried
@@ -275,7 +275,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the average total supply between two timestamps
+   * @notice Looks up the average total supply between two timestamps.
    * @dev Timestamps are Unix timestamps denominated in seconds
    * @param vault the vault for which the average total supply is being queried
    * @param startTime the start of the time range for which the average total supply is being queried
@@ -299,7 +299,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the newest observation  for a user
+   * @notice Looks up the newest observation  for a user.
    * @param vault the vault for which the observation is being queried
    * @param user the user whose observation is being queried
    * @return index The index of the observation
@@ -314,7 +314,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the oldest observation  for a user
+   * @notice Looks up the oldest observation  for a user.
    * @param vault the vault for which the observation is being queried
    * @param user the user whose observation is being queried
    * @return index The index of the observation
@@ -329,7 +329,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the newest total supply observation for a vault
+   * @notice Looks up the newest total supply observation for a vault.
    * @param vault the vault for which the observation is being queried
    * @return index The index of the observation
    * @return observation The total supply observation
@@ -342,7 +342,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the oldest total supply observation for a vault
+   * @notice Looks up the oldest total supply observation for a vault.
    * @param vault the vault for which the observation is being queried
    * @return index The index of the observation
    * @return observation The total supply observation
@@ -449,7 +449,7 @@ contract TwabController {
   /* ============ External Write Functions ============ */
 
   /**
-   * @notice Mints new balance and delegateBalance for a given user
+   * @notice Mints new balance and delegateBalance for a given user.
    * @dev Note that if the provided user to mint to is delegating that the delegate's
    *      delegateBalance will be updated.
    * @dev Mint is expected to be called by the Vault.
@@ -461,7 +461,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Burns balance and delegateBalance for a given user
+   * @notice Burns balance and delegateBalance for a given user.
    * @dev Note that if the provided user to burn from is delegating that the delegate's
    *      delegateBalance will be updated.
    * @dev Burn is expected to be called by the Vault.
@@ -473,7 +473,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Transfers balance and delegateBalance from a given user
+   * @notice Transfers balance and delegateBalance from a given user.
    * @dev Note that if the provided user to transfer from is delegating that the delegate's
    *      delegateBalance will be updated.
    * @param _from The address to transfer the balance and delegateBalance from

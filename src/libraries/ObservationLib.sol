@@ -76,7 +76,7 @@ library ObservationLib {
 
       // We've landed on an uninitialized timestamp, keep searching higher (more recently).
       if (beforeOrAtTimestamp == 0) {
-        leftSide = currentIndex + 1;
+        leftSide = uint16(RingBufferLib.nextIndex(leftSide, _cardinality));
         continue;
       }
 

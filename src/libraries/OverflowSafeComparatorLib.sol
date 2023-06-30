@@ -38,7 +38,7 @@ library OverflowSafeComparatorLib {
     return aAdjusted <= bAdjusted;
   }
 
-  /// @notice 32-bit timestamp subtractor
+  /// @notice 32-bit timestamp subtractor.
   /// @dev safe for 0 or 1 overflows, where `_a` and `_b` must be chronologically before or equal to time
   /// @param _a The subtraction left operand
   /// @param _b The subtraction right operand
