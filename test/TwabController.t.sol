@@ -4,9 +4,9 @@ pragma solidity 0.8.17;
 import "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 
-import { TwabController, SameDelegateAlreadySet } from "src/TwabController.sol";
-import { TwabLib } from "src/libraries/TwabLib.sol";
-import { ObservationLib } from "src/libraries/ObservationLib.sol";
+import { TwabController, SameDelegateAlreadySet } from "../src/TwabController.sol";
+import { TwabLib } from "../src/libraries/TwabLib.sol";
+import { ObservationLib } from "../src/libraries/ObservationLib.sol";
 import { BaseTest } from "test/utils/BaseTest.sol";
 
 contract TwabControllerTest is BaseTest {

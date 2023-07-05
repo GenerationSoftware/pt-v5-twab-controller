@@ -4,9 +4,9 @@ pragma solidity 0.8.17;
 import { console2 } from "forge-std/console2.sol";
 
 import { BaseTest } from "test/utils/BaseTest.sol";
-import { TwabLib, BalanceLTAmount, DelegateBalanceLTAmount } from "src/libraries/TwabLib.sol";
+import { TwabLib, BalanceLTAmount, DelegateBalanceLTAmount } from "../src/libraries/TwabLib.sol";
 import { TwabLibMock } from "test/mocks/TwabLibMock.sol";
-import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
+import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 
 contract TwabLibTest is BaseTest {
   TwabLibMock public twabLibMock;

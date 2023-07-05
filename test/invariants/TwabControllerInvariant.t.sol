@@ -6,9 +6,9 @@ import { Test } from "forge-std/Test.sol";
 import { InvariantTest } from "forge-std/InvariantTest.sol";
 import { console2 } from "forge-std/console2.sol";
 
-import { TwabLib } from "src/libraries/TwabLib.sol";
-import { TwabController } from "src/TwabController.sol";
-import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
+import { TwabLib } from "../../src/libraries/TwabLib.sol";
+import { TwabController } from "../../src/TwabController.sol";
+import { ObservationLib, MAX_CARDINALITY } from "../../src/libraries/ObservationLib.sol";
 
 import { BaseTest } from "test/utils/BaseTest.sol";
 import { TwabControllerHandler } from "./handlers/TwabControllerHandler.sol";

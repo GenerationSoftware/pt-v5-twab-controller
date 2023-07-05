@@ -4,8 +4,8 @@ pragma solidity 0.8.17;
 import "forge-std/Test.sol";
 import { Utils } from "./Utils.sol";
 
-import { TwabLib } from "src/libraries/TwabLib.sol";
-import { ObservationLib } from "src/libraries/ObservationLib.sol";
+import { TwabLib } from "../../src/libraries/TwabLib.sol";
+import { ObservationLib } from "../../src/libraries/ObservationLib.sol";
 
 contract BaseTest is Test {
   Utils internal utils;

@@ -4,8 +4,8 @@ pragma solidity 0.8.17;
 
 import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
 
-import { TwabLib } from "src/libraries/TwabLib.sol";
-import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
+import { TwabLib } from "../../src/libraries/TwabLib.sol";
+import { ObservationLib, MAX_CARDINALITY } from "../../src/libraries/ObservationLib.sol";
 
 contract ObservationLibMock {
   ObservationLib.Observation[MAX_CARDINALITY] observations;

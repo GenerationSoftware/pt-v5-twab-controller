@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.17;
 
-import { TwabLib } from "src/libraries/TwabLib.sol";
-import { ObservationLib } from "src/libraries/ObservationLib.sol";
+import { TwabLib } from "../../src/libraries/TwabLib.sol";
+import { ObservationLib } from "../../src/libraries/ObservationLib.sol";
 
 contract TwabLibMock {
   uint16 public constant MAX_CARDINALITY = 365;

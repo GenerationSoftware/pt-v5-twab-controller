@@ -7,9 +7,9 @@ import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 
 import { Utils } from "test/utils/Utils.sol";
-import { TwabController } from "src/TwabController.sol";
-import { TwabLib } from "src/libraries/TwabLib.sol";
-import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
+import { TwabController } from "../../../src/TwabController.sol";
+import { TwabLib } from "../../../src/libraries/TwabLib.sol";
+import { ObservationLib, MAX_CARDINALITY } from "../../../src/libraries/ObservationLib.sol";
 import { VaultAddressSet, VaultAddressSetLib } from "../helpers/VaultAddressSet.sol";
 
 contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {

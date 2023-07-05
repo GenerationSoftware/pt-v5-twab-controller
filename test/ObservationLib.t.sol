@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 
 import { BaseTest } from "test/utils/BaseTest.sol";
-import { ObservationLib, MAX_CARDINALITY } from "src/libraries/ObservationLib.sol";
+import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
 import { ObservationLibMock } from "test/mocks/ObservationLibMock.sol";
 
