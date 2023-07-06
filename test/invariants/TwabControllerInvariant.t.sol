@@ -3,7 +3,6 @@
 pragma solidity 0.8.17;
 
 import { Test } from "forge-std/Test.sol";
-import { InvariantTest } from "forge-std/InvariantTest.sol";
 import { console2 } from "forge-std/console2.sol";
 
 import { TwabLib } from "../../src/libraries/TwabLib.sol";
@@ -13,7 +12,7 @@ import { ObservationLib, MAX_CARDINALITY } from "../../src/libraries/Observation
 import { BaseTest } from "test/utils/BaseTest.sol";
 import { TwabControllerHandler } from "./handlers/TwabControllerHandler.sol";
 
-contract TwabControllerInvariant is BaseTest, InvariantTest {
+contract TwabControllerInvariant is BaseTest {
   TwabController public twabController;
   TwabControllerHandler public handler;
   uint32 public constant PERIOD_OFFSET = 10 days;
