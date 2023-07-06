@@ -53,12 +53,13 @@ library TwabLib {
 
   /**
    * @notice Account details and historical twabs.
+   * @dev The size of observations is MAX_CARDINALITY from the ObservationLib.
    * @param details The account details
    * @param observations The history of observations for this account
    */
   struct Account {
     AccountDetails details;
-    ObservationLib.Observation[MAX_CARDINALITY] observations;
+    ObservationLib.Observation[365] observations;
   }
 
   /**
