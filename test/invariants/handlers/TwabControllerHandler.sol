@@ -6,11 +6,12 @@ import { CommonBase } from "forge-std/Base.sol";
 import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 
-import { Utils } from "test/utils/Utils.sol";
 import { TwabController } from "../../../src/TwabController.sol";
 import { TwabLib } from "../../../src/libraries/TwabLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../../../src/libraries/ObservationLib.sol";
 import { VaultAddressSet, VaultAddressSetLib } from "../helpers/VaultAddressSet.sol";
+
+import { Utils } from "../../utils/Utils.sol";
 
 contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
   using VaultAddressSetLib for VaultAddressSet;

@@ -7,7 +7,7 @@ import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { TwabController, SameDelegateAlreadySet } from "../src/TwabController.sol";
 import { TwabLib } from "../src/libraries/TwabLib.sol";
 import { ObservationLib } from "../src/libraries/ObservationLib.sol";
-import { BaseTest } from "test/utils/BaseTest.sol";
+import { BaseTest } from "./utils/BaseTest.sol";
 
 contract TwabControllerTest is BaseTest {
   TwabController public twabController;

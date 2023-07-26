@@ -9,7 +9,7 @@ import { TwabLib } from "../../src/libraries/TwabLib.sol";
 import { TwabController } from "../../src/TwabController.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../../src/libraries/ObservationLib.sol";
 
-import { BaseTest } from "test/utils/BaseTest.sol";
+import { BaseTest } from "../utils/BaseTest.sol";
 import { TwabControllerHandler } from "./handlers/TwabControllerHandler.sol";
 
 contract TwabControllerInvariant is BaseTest {

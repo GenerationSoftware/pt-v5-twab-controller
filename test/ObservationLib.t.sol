@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { BaseTest } from "test/utils/BaseTest.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
-import { ObservationLibMock } from "test/mocks/ObservationLibMock.sol";
+import { BaseTest } from "./utils/BaseTest.sol";
+import { ObservationLibMock } from "./mocks/ObservationLibMock.sol";
 
 contract ObservationLibTest is BaseTest {
   ObservationLibMock public observationLibMock;
