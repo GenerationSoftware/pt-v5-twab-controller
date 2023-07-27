@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { TwabLib } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";

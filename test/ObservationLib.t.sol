@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 import { RingBufferLib } from "ring-buffer-lib/RingBufferLib.sol";
