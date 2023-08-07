@@ -232,7 +232,7 @@ contract TwabController {
     uint32 targetTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    return TwabLib.getBalanceAt(PERIOD_OFFSET, _account.observations, _account.details, targetTime);
+    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, targetTime);
   }
 
   /**
@@ -243,7 +243,7 @@ contract TwabController {
    */
   function getTotalSupplyAt(address vault, uint32 targetTime) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    return TwabLib.getBalanceAt(PERIOD_OFFSET, _account.observations, _account.details, targetTime);
+    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, targetTime);
   }
 
   /**
@@ -264,6 +264,7 @@ contract TwabController {
     TwabLib.Account storage _account = userObservations[vault][user];
     return
       TwabLib.getTwabBetween(
+        PERIOD_LENGTH,
         PERIOD_OFFSET,
         _account.observations,
         _account.details,
@@ -288,6 +289,7 @@ contract TwabController {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
     return
       TwabLib.getTwabBetween(
+        PERIOD_LENGTH,
         PERIOD_OFFSET,
         _account.observations,
         _account.details,
@@ -362,86 +364,12 @@ contract TwabController {
   }
 
   /**
-   * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the time being queried is in a period that has not yet ended, the output for this function may change.
-   * @param vault The vault to check
-   * @param user The user to check
+   * @notice Checks if the given timestamp occurs during the current overwrite period.
    * @param time The timestamp to check
    * @return isSafe Whether or not the timestamp is safe
    */
-  function isTimeSafe(address vault, address user, uint32 time) external view returns (bool) {
-    TwabLib.Account storage account = userObservations[vault][user];
-    return
-      TwabLib.isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, account.observations, account.details, time);
-  }
-
-  /**
-   * @notice Checks if the given time range is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the endtime being queried is in a period that has not yet ended, the output for this function may change.
-   * @param vault The vault to check
-   * @param user The user to check
-   * @param startTime The start of the timerange to check
-   * @param endTime The end of the timerange to check
-   * @return isSafe Whether or not the time range is safe
-   */
-  function isTimeRangeSafe(
-    address vault,
-    address user,
-    uint32 startTime,
-    uint32 endTime
-  ) external view returns (bool) {
-    TwabLib.Account storage account = userObservations[vault][user];
-    return
-      TwabLib.isTimeRangeSafe(
-        PERIOD_LENGTH,
-        PERIOD_OFFSET,
-        account.observations,
-        account.details,
-        startTime,
-        endTime
-      );
-  }
-
-  /**
-   * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the time being queried is in a period that has not yet ended, the output for this function may change.
-   * @param vault The vault to check
-   * @param time The timestamp to check
-   * @return isSafe Whether or not the timestamp is safe
-   */
-  function isTotalSupplyTimeSafe(address vault, uint32 time) external view returns (bool) {
-    TwabLib.Account storage account = totalSupplyObservations[vault];
-    return
-      TwabLib.isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, account.observations, account.details, time);
-  }
-
-  /**
-   * @notice Checks if the given time range is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the endtime being queried is in a period that has not yet ended, the output for this function may change.
-   * @param vault The vault to check
-   * @param startTime The start of the timerange to check
-   * @param endTime The end of the timerange to check
-   * @return isSafe Whether or not the time range is safe
-   */
-  function isTotalSupplyTimeRangeSafe(
-    address vault,
-    uint32 startTime,
-    uint32 endTime
-  ) external view returns (bool) {
-    TwabLib.Account storage account = totalSupplyObservations[vault];
-    return
-      TwabLib.isTimeRangeSafe(
-        PERIOD_LENGTH,
-        PERIOD_OFFSET,
-        account.observations,
-        account.details,
-        startTime,
-        endTime
-      );
+  function isDuringOverwritePeriod(uint32 time) external view returns (bool) {
+    return TwabLib.isDuringOverwritePeriod(PERIOD_LENGTH, PERIOD_OFFSET, time);
   }
 
   /* ============ External Write Functions ============ */

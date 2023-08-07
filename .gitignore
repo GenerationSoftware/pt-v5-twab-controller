@@ -12,6 +12,7 @@ out/
 .envrc
 node_modules
 .history
+lcov.info
 
 # Docs
 docs

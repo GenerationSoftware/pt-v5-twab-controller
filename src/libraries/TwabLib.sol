@@ -65,6 +65,8 @@ library TwabLib {
   /**
    * @notice Increase a user's balance and delegate balance by a given amount.
    * @dev This function mutates the provided account.
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _account The account to update
    * @param _amount The amount to increase the balance by
    * @param _delegateAmount The amount to increase the delegate balance by
@@ -133,6 +135,8 @@ library TwabLib {
   /**
    * @notice Decrease a user's balance and delegate balance by a given amount.
    * @dev This function mutates the provided account.
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _account The account to update
    * @param _amount The amount to decrease the balance by
    * @param _delegateAmount The amount to decrease the delegate balance by
@@ -252,33 +256,39 @@ library TwabLib {
   }
 
   /**
-   * @notice Looks up a users balance at a specific time in the past.
+   * @notice Looks up a users balance at a specific time in the past. Ignores any updates during the current overwrite period.
    * @dev If the time is not an exact match of an observation, the balance is extrapolated using the previous observation.
-   * @dev Ensure timestamps are safe using isTimeSafe or by ensuring you're querying a multiple of the observation period intervals.
+   * @dev Ensure timestamps are safe using isDuringOverwritePeriod or by ensuring you're querying a multiple of the observation period intervals.
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @param _targetTime The time to look up the balance at
    * @return balance The balance at the target time
    */
   function getBalanceAt(
+    uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) internal view returns (uint256) {
+    uint32 overwritePeriodStartTime = _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
+    uint32 safeTargetTime = _targetTime < overwritePeriodStartTime ? _targetTime : overwritePeriodStartTime - 1;
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      _targetTime
+      safeTargetTime
     );
     return prevOrAtObservation.balance;
   }
 
   /**
-   * @notice Looks up a users TWAB for a time range.
+   * @notice Looks up a users TWAB for a time range. Ignores any updates during the current overwrite period.
    * @dev If the timestamps in the range are not exact matches of observations, the balance is extrapolated using the previous observation.
-   * @dev Ensure timestamps are safe using isTimeRangeSafe.
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @param _startTime The start of the time range
@@ -286,38 +296,52 @@ library TwabLib {
    * @return twab The TWAB for the time range
    */
   function getTwabBetween(
+    uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _startTime,
     uint32 _endTime
   ) internal view returns (uint256) {
+    // The current period can still be changed; so the start of the period marks the beginning of unsafe timestamps.
+    uint32 overwritePeriodStartTime = _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
+
+    // The start time must be older than the current period start time, so that it cannot be changed.
+    uint32 safeStartTime = _startTime < overwritePeriodStartTime ? _startTime : overwritePeriodStartTime - 1;
+
     ObservationLib.Observation memory startObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      _startTime
+      safeStartTime
     );
+
+    // The end time must be older than the current period start time, so that it cannot be changed.
+    uint32 safeEndTime = _endTime < overwritePeriodStartTime ? _endTime : overwritePeriodStartTime - 1;
+
+    if (safeEndTime == safeStartTime) {
+      return startObservation.balance;
+    }
 
     ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      _endTime
+      safeEndTime
     );
 
-    if (startObservation.timestamp != _startTime) {
-      startObservation = _calculateTemporaryObservation(startObservation, _startTime);
+    if (startObservation.timestamp != safeEndTime) {
+      startObservation = _calculateTemporaryObservation(startObservation, safeStartTime);
     }
 
-    if (endObservation.timestamp != _endTime) {
-      endObservation = _calculateTemporaryObservation(endObservation, _endTime);
+    if (endObservation.timestamp != safeEndTime) {
+      endObservation = _calculateTemporaryObservation(endObservation, safeEndTime);
     }
 
     // Difference in amount / time
     return
       (endObservation.cumulativeBalance - startObservation.cumulativeBalance) /
-      (_endTime - _startTime);
+      (safeEndTime - safeStartTime);
   }
 
   /**
@@ -343,6 +367,8 @@ library TwabLib {
    * @notice Looks up the next observation index to write to in the circular buffer.
    * @dev If the current time is in the same period as the newest observation, we overwrite it.
    * @dev If the current time is in a new period, we increment the index and write a new observation.
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @return index The index of the next observation
@@ -369,6 +395,7 @@ library TwabLib {
     }
 
     uint32 currentPeriod = _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, currentTime);
+
     uint32 newestObservationPeriod = _getTimestampPeriod(
       PERIOD_LENGTH,
       PERIOD_OFFSET,
@@ -391,6 +418,20 @@ library TwabLib {
   }
 
   /**
+   * @notice Computes the start time of the current period
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
+   */
+  function _overwritePeriodStartTime(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET
+  ) private view returns (uint32) {
+    uint32 currentTime = uint32(block.timestamp);
+    uint32 currentPeriod = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, currentTime);
+    return getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, currentPeriod);
+  }
+
+  /**
    * @notice Calculates the next cumulative balance using a provided Observation and timestamp.
    * @param _observation The observation to extrapolate from
    * @param _timestamp The timestamp to extrapolate to
@@ -410,8 +451,8 @@ library TwabLib {
   /**
    * @notice Calculates the period a timestamp falls within.
    * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0.
-   * @param PERIOD_LENGTH The period length to use to calculate the period
-   * @param PERIOD_OFFSET The period offset to use to calculate the period
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _timestamp The timestamp to calculate the period for
    * @return period The period
    */
@@ -424,11 +465,24 @@ library TwabLib {
   }
 
   /**
+   * @notice Computes the overwrite period start time given the current time
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
+   * @return The start time for the current overwrite period.
+   */
+  function currentOverwritePeriodStartTime(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET
+  ) internal view returns (uint32) {
+    return _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
+  }
+
+  /**
    * @notice Calculates the period a timestamp falls within.
    * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0. PERIOD_OFFSET + 1 seconds is the start of period 1.
    * @dev All timestamps landing on multiples of PERIOD_LENGTH are the ends of periods.
-   * @param PERIOD_LENGTH The period length to use to calculate the period
-   * @param PERIOD_OFFSET The period offset to use to calculate the period
+   * @param PERIOD_LENGTH The length of an overwrite period
+   * @param PERIOD_OFFSET The offset of the first period
    * @param _timestamp The timestamp to calculate the period for
    * @return period The period
    */
@@ -437,17 +491,37 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     uint32 _timestamp
   ) private pure returns (uint32 period) {
-    if (_timestamp <= PERIOD_OFFSET) {
+    if (_timestamp < PERIOD_OFFSET) {
       return 0;
     }
     // Shrink by 1 to ensure periods end on a multiple of PERIOD_LENGTH.
     // Increase by 1 to start periods at # 1.
-    return ((_timestamp - PERIOD_OFFSET - 1) / PERIOD_LENGTH) + 1;
+    return (_timestamp - PERIOD_OFFSET) / PERIOD_LENGTH + 1;
+  }
+
+  /**
+   * @notice Calculates the start timestamp for a period
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
+   * @param _period The period to check
+   * @return _timestamp The timestamp at which the period starts
+   */
+  function getPeriodStartTime(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _period
+  ) internal pure returns (uint32) {
+    if (_period == 0) {
+      return 0;
+    }
+
+    return (_period - 1) * PERIOD_LENGTH + PERIOD_OFFSET;
   }
 
   /**
    * @notice Looks up the newest observation before or at a given timestamp.
    * @dev If an observation is available at the target time, it is returned. Otherwise, the newest observation before the target time is returned.
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @param _targetTime The timestamp to look up
@@ -493,18 +567,14 @@ library TwabLib {
       return prevOrAtObservation;
     }
 
-    // If there is only 1 actual observation, either return that observation or a zeroed observation
+    // If there is only 1 observation and it's after the target, then return zero
     if (_accountDetails.cardinality == 1) {
-      if (_targetTime >= prevOrAtObservation.timestamp) {
-        return prevOrAtObservation;
-      } else {
-        return
-          ObservationLib.Observation({
-            cumulativeBalance: 0,
-            balance: 0,
-            timestamp: PERIOD_OFFSET
-          });
-      }
+      return
+        ObservationLib.Observation({
+          cumulativeBalance: 0,
+          balance: 0,
+          timestamp: PERIOD_OFFSET
+        });
     }
 
     // Find the oldest Observation and check if the target time is BEFORE it
@@ -534,222 +604,34 @@ library TwabLib {
   }
 
   /**
-   * @notice Looks up the next observation after a given timestamp.
-   * @dev If the requested time is at or after the newest observation, then the newest is returned.
-   * @param _observations The circular buffer of observations
-   * @param _accountDetails The account details to query with
-   * @param _targetTime The timestamp to look up
-   * @return nextOrNewestObservation The observation
-   */
-  function getNextOrNewestObservation(
-    uint32 PERIOD_OFFSET,
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
-    uint32 _targetTime
-  ) internal view returns (ObservationLib.Observation memory nextOrNewestObservation) {
-    return _getNextOrNewestObservation(PERIOD_OFFSET, _observations, _accountDetails, _targetTime);
-  }
-
-  /**
-   * @notice Looks up the next observation after a given timestamp.
-   * @dev If the requested time is at or after the newest observation, then the newest is returned.
-   * @param _observations The circular buffer of observations
-   * @param _accountDetails The account details to query with
-   * @param _targetTime The timestamp to look up
-   * @return nextOrNewestObservation The observation
-   */
-  function _getNextOrNewestObservation(
-    uint32 PERIOD_OFFSET,
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
-    uint32 _targetTime
-  ) private view returns (ObservationLib.Observation memory nextOrNewestObservation) {
-    uint32 currentTime = uint32(block.timestamp);
-
-    uint16 oldestTwabIndex;
-
-    // If there are no observations, return a zeroed observation
-    if (_accountDetails.cardinality == 0) {
-      return
-        ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
-    }
-
-    // Find the oldest Observation and check if the target time is BEFORE it
-    (oldestTwabIndex, nextOrNewestObservation) = getOldestObservation(
-      _observations,
-      _accountDetails
-    );
-    if (_targetTime < nextOrNewestObservation.timestamp) {
-      return nextOrNewestObservation;
-    }
-
-    // If there is only 1 observation and the time is at or after (checked above), return a zeroed observation
-    if (_accountDetails.cardinality == 1) {
-      return
-        ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
-    }
-
-    // Find the newest observation and check if the target time is AFTER it
-    (
-      uint16 newestTwabIndex,
-      ObservationLib.Observation memory newestObservation
-    ) = getNewestObservation(_observations, _accountDetails);
-    if (_targetTime >= newestObservation.timestamp) {
-      return newestObservation;
-    }
-
-    ObservationLib.Observation memory beforeOrAt;
-    // Otherwise, we perform a binarySearch to find the observation before or at the timestamp
-    (beforeOrAt, nextOrNewestObservation) = ObservationLib.binarySearch(
-      _observations,
-      newestTwabIndex,
-      oldestTwabIndex,
-      _targetTime + 1 seconds, // Increase by 1 second to ensure we get the next observation
-      _accountDetails.cardinality,
-      currentTime
-    );
-
-    if (beforeOrAt.timestamp > _targetTime) {
-      return beforeOrAt;
-    }
-
-    return nextOrNewestObservation;
-  }
-
-  /**
-   * @notice Looks up the previous and next observations for a given timestamp.
-   * @param _observations The circular buffer of observations
-   * @param _accountDetails The account details to query with
-   * @param _targetTime The timestamp to look up
-   * @return prevOrAtObservation The observation before or at the timestamp
-   * @return nextOrNewestObservation The observation after the timestamp or the newest observation.
-   */
-  function _getSurroundingOrAtObservations(
-    uint32 PERIOD_OFFSET,
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
-    uint32 _targetTime
-  )
-    private
-    view
-    returns (
-      ObservationLib.Observation memory prevOrAtObservation,
-      ObservationLib.Observation memory nextOrNewestObservation
-    )
-  {
-    prevOrAtObservation = _getPreviousOrAtObservation(
-      PERIOD_OFFSET,
-      _observations,
-      _accountDetails,
-      _targetTime
-    );
-    nextOrNewestObservation = _getNextOrNewestObservation(
-      PERIOD_OFFSET,
-      _observations,
-      _accountDetails,
-      _targetTime
-    );
-  }
-
-  /**
    * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the time being queried is in a period that has not yet ended, the output for this function may change.
-   * @param _observations The circular buffer of observations
-   * @param _accountDetails The account details to query with
+   * @dev A timestamp is safe if it is before the current overwrite period
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
    * @param _time The timestamp to check
    * @return isSafe Whether or not the timestamp is safe
    */
-  function isTimeSafe(
+  function isDuringOverwritePeriod(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET,
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
     uint32 _time
   ) internal view returns (bool) {
-    return _isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, _observations, _accountDetails, _time);
+    return _isDuringOverwritePeriod(PERIOD_LENGTH, PERIOD_OFFSET, _time);
   }
 
   /**
    * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the time being queried is in a period that has not yet ended, the output for this function may change.
-   * @param _observations The circular buffer of observations
-   * @param _accountDetails The account details to query with
+   * @dev A timestamp is safe if it is before the current overwrite period
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
    * @param _time The timestamp to check
    * @return isSafe Whether or not the timestamp is safe
    */
-  function _isTimeSafe(
+  function _isDuringOverwritePeriod(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET,
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
     uint32 _time
   ) private view returns (bool) {
-    // If there are no observations, it's an unsafe range
-    if (_accountDetails.cardinality == 0) {
-      return false;
-    }
-    // If there is one observation, compare it's timestamp
-    uint32 period = _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _time);
-
-    if (_accountDetails.cardinality == 1) {
-      return
-        period != _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _observations[0].timestamp)
-          ? true
-          : _time >= _observations[0].timestamp;
-    }
-    ObservationLib.Observation memory preOrAtObservation;
-    ObservationLib.Observation memory nextOrNewestObservation;
-
-    (, nextOrNewestObservation) = getNewestObservation(_observations, _accountDetails);
-
-    if (_time >= nextOrNewestObservation.timestamp) {
-      return true;
-    }
-
-    (preOrAtObservation, nextOrNewestObservation) = _getSurroundingOrAtObservations(
-      PERIOD_OFFSET,
-      _observations,
-      _accountDetails,
-      _time
-    );
-
-    uint32 preOrAtPeriod = _getTimestampPeriod(
-      PERIOD_LENGTH,
-      PERIOD_OFFSET,
-      preOrAtObservation.timestamp
-    );
-    uint32 postPeriod = _getTimestampPeriod(
-      PERIOD_LENGTH,
-      PERIOD_OFFSET,
-      nextOrNewestObservation.timestamp
-    );
-
-    // The observation after it falls in a new period
-    return period >= preOrAtPeriod && period < postPeriod;
-  }
-
-  /**
-   * @notice Checks if the given time range is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is between (or at) the newest observation in a period and the end of the period.
-   * @dev If the endtime being queried is in a period that has not yet ended, the output for this function may change.
-   * @param _observations The circular buffer of observations
-   * @param _accountDetails The account details to query with
-   * @param _startTime The start of the time range to check
-   * @param _endTime The end of the time range to check
-   * @return isSafe Whether or not the time range is safe
-   */
-  function isTimeRangeSafe(
-    uint32 PERIOD_LENGTH,
-    uint32 PERIOD_OFFSET,
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
-    uint32 _startTime,
-    uint32 _endTime
-  ) internal view returns (bool) {
-    return
-      _isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, _observations, _accountDetails, _startTime) &&
-      _isTimeSafe(PERIOD_LENGTH, PERIOD_OFFSET, _observations, _accountDetails, _endTime);
+    return _time < _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 }

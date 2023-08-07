@@ -231,7 +231,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         // Check if the newest observation is safe for this vault
         isVaultsSafe =
           isVaultsSafe &&
-          twabController.isTotalSupplyTimeSafe(vault, newestObservation.timestamp);
+          twabController.isDuringOverwritePeriod(newestObservation.timestamp);
 
         // For Each Actor
         for (uint256 j; j < _addrs.actors[vault].length; ++j) {
@@ -244,7 +244,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
             // Check if the newest observation is safe for this actor
             isActorsSafe =
               isActorsSafe &&
-              twabController.isTimeSafe(vault, actor, newestObservation.timestamp);
+              twabController.isDuringOverwritePeriod(newestObservation.timestamp);
           }
         }
       }
@@ -259,7 +259,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
     ObservationLib.Observation memory observation;
     TwabLib.Account memory account;
 
-    // Need to jump back to the latest time stamp to ensure isTimeSafe checks are safe.
+    // Need to jump back to the latest time stamp to ensure isDuringOverwritePeriod checks are safe.
     vm.warp(h_blockTimestamp);
 
     // For Each Vault
@@ -274,21 +274,21 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         // Check if the newest observation is safe for this vault
         isVaultsSafe =
           isVaultsSafe &&
-          twabController.isTotalSupplyTimeSafe(vault, newestObservation.timestamp);
+          twabController.isDuringOverwritePeriod(newestObservation.timestamp);
 
         // Check if each observation is safe for this vault
         for (uint256 o_i; o_i < account.details.cardinality; ++o_i) {
           observation = account.observations[o_i];
           isVaultsSafe =
             isVaultsSafe &&
-            twabController.isTotalSupplyTimeSafe(vault, observation.timestamp);
+            twabController.isDuringOverwritePeriod(observation.timestamp);
         }
 
         // Check if each period end timestamp is safe for this vault
         uint32 newestPeriod = twabController.getTimestampPeriod(newestObservation.timestamp);
         for (uint32 p_i = 1; p_i < newestPeriod; ++p_i) {
           uint32 timestamp = PERIOD_OFFSET + (p_i * PERIOD_LENGTH);
-          isVaultsSafe = isVaultsSafe && twabController.isTotalSupplyTimeSafe(vault, timestamp);
+          isVaultsSafe = isVaultsSafe && twabController.isDuringOverwritePeriod(timestamp);
         }
 
         // For Each Actor
@@ -303,14 +303,14 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
             // Check if the newest observation is safe for this actor
             isActorsSafe =
               isActorsSafe &&
-              twabController.isTimeSafe(vault, actor, newestObservation.timestamp);
+              twabController.isDuringOverwritePeriod(newestObservation.timestamp);
 
             // Check if each observation is safe for this actor
             for (uint256 o_i; o_i < account.details.cardinality; ++o_i) {
               observation = account.observations[o_i];
               isActorsSafe =
                 isActorsSafe &&
-                twabController.isTimeSafe(vault, actor, observation.timestamp);
+                twabController.isDuringOverwritePeriod(observation.timestamp);
             }
 
             // Check if each period end timestamp is safe for this actor
@@ -318,7 +318,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
             for (uint32 p_i = 1; p_i <= newestPeriod; ++p_i) {
               uint32 timestamp = PERIOD_OFFSET + (p_i * PERIOD_LENGTH);
               twabController.getTimestampPeriod(timestamp);
-              isVaultsSafe = isVaultsSafe && twabController.isTimeSafe(vault, actor, timestamp);
+              isVaultsSafe = isVaultsSafe && twabController.isDuringOverwritePeriod(timestamp);
             }
           }
         }
