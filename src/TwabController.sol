@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
 import { TwabLib } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";
 
@@ -20,6 +21,8 @@ error SameDelegateAlreadySet(address delegate);
             The TwabLib guarantees minimum 1 year of search history if a period is a day.
  */
 contract TwabController {
+  using SafeCast for uint256;
+
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
   address public constant SPONSORSHIP_ADDRESS = address(1);
 
@@ -657,7 +660,7 @@ contract TwabController {
       _vault,
       _currentDelegate,
       _to,
-      uint96(userObservations[_vault][_from].details.balance)
+      SafeCast.toUint96(userObservations[_vault][_from].details.balance)
     );
 
     emit Delegated(_vault, _from, _to);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 
 import "ring-buffer-lib/RingBufferLib.sol";
 
+import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
 import "./OverflowSafeComparatorLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
 
@@ -117,7 +118,7 @@ library TwabLib {
       }
 
       observation = ObservationLib.Observation({
-        balance: uint96(accountDetails.delegateBalance),
+        balance: SafeCast.toUint96(accountDetails.delegateBalance),
         cumulativeBalance: _extrapolateFromBalance(newestObservation, currentTime),
         timestamp: currentTime
       });
@@ -201,7 +202,7 @@ library TwabLib {
       }
 
       observation = ObservationLib.Observation({
-        balance: uint96(accountDetails.delegateBalance),
+        balance: SafeCast.toUint96(accountDetails.delegateBalance),
         cumulativeBalance: _extrapolateFromBalance(newestObservation, currentTime),
         timestamp: currentTime
       });
