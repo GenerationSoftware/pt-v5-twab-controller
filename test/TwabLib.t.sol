@@ -57,6 +57,8 @@ contract TwabLibTest is BaseTest {
     assertFalse(_isNew);
     assertFalse(_isRecorded);
 
+    vm.warp(_currentTimestamp + PERIOD_LENGTH);
+
     // No Observation has been recorded since delegate balance hasn't changed so balance is 0
     assertEq(twabLibMock.getBalanceAt(_initialTimestamp), 0);
     assertEq(twabLibMock.getBalanceAt(_currentTimestamp), 0);
@@ -83,9 +85,9 @@ contract TwabLibTest is BaseTest {
     assertTrue(_isRecorded);
 
     assertEq(twabLibMock.getBalanceAt(_initialTimestamp), 0);
-    assertEq(twabLibMock.getBalanceAt(_currentTimestamp), 0); // isn't safe yet
 
     vm.warp(_currentTimestamp + PERIOD_LENGTH);
+
     assertEq(twabLibMock.getBalanceAt(_currentTimestamp), _amount); // now is safe!
   }
 
@@ -113,7 +115,6 @@ contract TwabLibTest is BaseTest {
     assertEq(_observation.timestamp, _currentTimestamp);
     assertFalse(_isNew);
 
-    assertEq(twabLibMock.getBalanceAt(_currentTimestamp), 0);
     vm.warp(_currentTimestamp + PERIOD_LENGTH);
     assertEq(twabLibMock.getBalanceAt(_currentTimestamp), _totalAmount);
   }
@@ -231,7 +232,6 @@ contract TwabLibTest is BaseTest {
     assertTrue(_isNew, "was a new observation");
 
     assertEq(twabLibMock.getBalanceAt(_initialTimestamp), _amount, "balance at initial timestamp is correct");
-    assertEq(twabLibMock.getBalanceAt(_secondTimestamp), _amount, "current balance is still the old balance");
 
     vm.warp(_secondTimestamp + PERIOD_LENGTH);
 
@@ -415,8 +415,8 @@ contract TwabLibTest is BaseTest {
     initialTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH);
     currentTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
 
-    console2.log("initialTimestamp", initialTimestamp);
-    console2.log("currentTimestamp", currentTimestamp);
+    // console2.log("initialTimestamp", initialTimestamp);
+    // console2.log("currentTimestamp", currentTimestamp);
 
     vm.warp(initialTimestamp);
     twabLibMock.increaseBalances(0, amount);
@@ -451,10 +451,11 @@ contract TwabLibTest is BaseTest {
   function testGetTwabBetweenSingleFuture() public {
     (uint32 secondPeriodTimestamp, , uint96 amount) = averageDelegateBalanceBetweenSingleSetup();
 
-    vm.warp(secondPeriodTimestamp);
+    vm.warp(secondPeriodTimestamp + PERIOD_LENGTH);
     uint256 _balance = twabLibMock.getTwabBetween(secondPeriodTimestamp - 50, secondPeriodTimestamp + 50);
 
-    assertEq(_balance, 0);
+    // half = zero, other half = amount
+    assertEq(_balance, amount / 2);
   }
 
   function testGetTwabBetweenSingleCentered() public {
@@ -477,8 +478,8 @@ contract TwabLibTest is BaseTest {
 
     ) = averageDelegateBalanceBetweenSingleSetup();
 
-    console2.log("testGetTwabBetweenSingleAfter secondPeriodStartTime", secondPeriodStartTime);
-    console2.log("testGetTwabBetweenSingleAfter thirdPeriodStartTime", thirdPeriodStartTime);
+    // console2.log("testGetTwabBetweenSingleAfter secondPeriodStartTime", secondPeriodStartTime);
+    // console2.log("testGetTwabBetweenSingleAfter thirdPeriodStartTime", thirdPeriodStartTime);
 
     vm.warp(thirdPeriodStartTime);
     uint256 _balance = twabLibMock.getTwabBetween(secondPeriodStartTime + 50, secondPeriodStartTime + 51);
@@ -632,13 +633,13 @@ contract TwabLibTest is BaseTest {
     assertEq(twabLibMock.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, 2), PERIOD_OFFSET + PERIOD_LENGTH);
   }
 
-  function testCurrentOverwritePeriodStartTime_atStart() public {
-    assertEq(twabLibMock.currentOverwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
+  function testcurrentOverwritePeriodStartedAt_atStart() public {
+    assertEq(twabLibMock.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
   }
 
-  function testCurrentOverwritePeriodStartTime_halfwayThroughFirst() public {
+  function testcurrentOverwritePeriodStartedAt_halfwayThroughFirst() public {
     vm.warp(PERIOD_OFFSET + PERIOD_LENGTH/2);
-    assertEq(twabLibMock.currentOverwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
+    assertEq(twabLibMock.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
   }
 
   function testDelegateBalanceAtSingleTwabBefore() public {
@@ -672,6 +673,8 @@ contract TwabLibTest is BaseTest {
     // Get balance for first large draw
     _balance = twabLibMock.getTwabBetween(PERIOD_OFFSET, PERIOD_OFFSET + LARGE_DRAW_LENGTH);
     assertEq(_balance, amount);
+
+    vm.warp(PERIOD_OFFSET + VERY_LARGE_DRAW_LENGTH + PERIOD_LENGTH);
 
     // Get balance for very large draw
     // Resulting temporary Observation for the end of the time range is as close to the limits of the cumulativeBalance portion of the Observation data structure as we can get.
@@ -883,31 +886,31 @@ contract TwabLibTest is BaseTest {
     assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET + PERIOD_LENGTH), 2);
   }
 
-  // ================== isDuringOverwritePeriod ==================
+  // ================== hasFinalized ==================
 
-  function testisDuringOverwritePeriod_beforeStart() public {
+  function testhasFinalized_beforeStart() public {
     vm.warp(PERIOD_OFFSET);
-    assertTrue(twabLibMock.isDuringOverwritePeriod(PERIOD_OFFSET-1));
+    assertTrue(twabLibMock.hasFinalized(PERIOD_OFFSET-1));
   }
 
-  function testisDuringOverwritePeriod_startOfOverwritePeriod() public {
+  function testhasFinalized_startOfOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET);
-    assertFalse(twabLibMock.isDuringOverwritePeriod(PERIOD_OFFSET));
+    assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET));
   }
 
-  function testisDuringOverwritePeriod_endOfOverwritePeriod() public {
+  function testhasFinalized_endOfOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET);
-    assertFalse(twabLibMock.isDuringOverwritePeriod(PERIOD_OFFSET + PERIOD_LENGTH - 1));
+    assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET + PERIOD_LENGTH - 1));
   }
 
-  function testisDuringOverwritePeriod_afterOverwritePeriod() public {
+  function testhasFinalized_afterOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET);
-    assertFalse(twabLibMock.isDuringOverwritePeriod(PERIOD_OFFSET + PERIOD_LENGTH));
+    assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET + PERIOD_LENGTH));
   }
 
-  function testisDuringOverwritePeriod_beforeOverwritePeriod() public {
+  function testhasFinalized_beforeOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
-    assertTrue(twabLibMock.isDuringOverwritePeriod(PERIOD_OFFSET));
+    assertTrue(twabLibMock.hasFinalized(PERIOD_OFFSET));
   }
 
   // ================== helpers  ==================

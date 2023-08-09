@@ -127,16 +127,16 @@ contract TwabLibMock {
     return start;
   }
 
-  function currentOverwritePeriodStartTime(
+  function currentOverwritePeriodStartedAt(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET
   ) external view returns (uint32) {
-    uint32 start = TwabLib.currentOverwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
+    uint32 start = TwabLib.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
     return start;
   }
 
-  function isDuringOverwritePeriod(uint32 _timestamp) external view returns (bool) {
-    bool isSafe = TwabLib.isDuringOverwritePeriod(
+  function hasFinalized(uint32 _timestamp) external view returns (bool) {
+    bool isSafe = TwabLib.hasFinalized(
       PERIOD_LENGTH,
       PERIOD_OFFSET,
       _timestamp

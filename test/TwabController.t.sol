@@ -5,7 +5,11 @@ import "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 
 import { TwabController, SameDelegateAlreadySet } from "../src/TwabController.sol";
-import { TwabLib } from "../src/libraries/TwabLib.sol";
+import {
+  TwabLib,
+  TimestampNotFinalized,
+  InvalidTimeRange
+} from "../src/libraries/TwabLib.sol";
 import { ObservationLib } from "../src/libraries/ObservationLib.sol";
 import { BaseTest } from "./utils/BaseTest.sol";
 
@@ -106,24 +110,20 @@ contract TwabControllerTest is BaseTest {
   }
 
   function testGetBalanceAt_beforeHistoryStarted() public {
+    // ensure times are finalized
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
     // Before history started
     assertEq(twabController.getBalanceAt(mockVault, alice, 0), 0);
     // At history start
     assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), 0);
   }
 
-  function testGetBalanceAt_withinCurrentPeriod() public {
-    vm.startPrank(mockVault);
-
-    // Mint at history start
-    uint96 _amount = 1000e18;
-    twabController.mint(alice, _amount);
-
+  function testGetBalanceAt_withinCurrentPeriodInvalid() public {
     // Half way through a period.
     vm.warp(PERIOD_OFFSET + (PERIOD_LENGTH / 2));
 
-    // still zero
-    assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), 0);
+    vm.expectRevert(abi.encodeWithSelector(TimestampNotFinalized.selector, PERIOD_OFFSET+10, PERIOD_OFFSET));
+    twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET+10);
   }
 
   function testGetBalanceAt_safeBalance() public {
@@ -249,67 +249,13 @@ contract TwabControllerTest is BaseTest {
     vm.stopPrank();
   }
 
-  function testGetTwabBetween_startTimeIsUnsafe_noObservations() public {
-    vm.warp(PERIOD_OFFSET);
-    twabController.mint(alice, 1000e18);
-
-    // now warp to the end of the period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH - 1);
-
-    // balance should still be zero, because the observation is unsafe
-    assertEq(twabController.getTwabBetween(address(this), alice, PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH / 2), 0);
-  }
-
-  function testGetTwabBetween_startTimeIsUnsafe_hasObservations() public {
-    vm.warp(PERIOD_OFFSET);
-    twabController.mint(alice, 1000e18);
-
-    // add observation to second period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
-    twabController.mint(alice, 2000e18);
-
-    // now warp to the end of the second period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2 - 1);
-
-    // balance should still be 1000e18, because it extrapolates from the first period
-    assertEq(twabController.getTwabBetween(address(this), alice, PERIOD_OFFSET + PERIOD_LENGTH*2, PERIOD_OFFSET + PERIOD_LENGTH*3), 1000e18);
-  }
-
-  function testGetTwabBetween_endTimeIsUnsafe_noResults() public {
-    // warp to the second period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
-    twabController.mint(alice, 1000e18);
-
-    // now warp to the end of the second period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2 - 1);
-
-    // the start time is valid, but the end time is not.
-    assertEq(twabController.getTwabBetween(address(this), alice, PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH*2 - 1), 0);
-  }
-
-  function testGetTwabBetween_endTimeIsUnsafe_hasObservations() public {
-    // warp to the second period
-    vm.warp(PERIOD_OFFSET);
-    twabController.mint(alice, 1000e18);
-
-    // add observation to second period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
-    twabController.mint(alice, 2000e18);
-
-    // now warp to the end of the second period
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2 - 1);
-
-    // the start time is valid, but the end time is not.
-    assertEq(twabController.getTwabBetween(address(this), alice, PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH*2 - 1), 1000e18);
-  }
-
-  function testGetTwabBetween_cannotBeAltered() public {
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
-    twabController.mint(alice, 1000e18);
-
+  function testGetTwabBetween_doesNotIncludeOverwritePeriod() public {
     uint32 startAt = PERIOD_OFFSET + PERIOD_LENGTH;
     uint32 endAt = startAt + PERIOD_LENGTH/2; // halfway between period 2
     uint32 afterEndAt = endAt + PERIOD_LENGTH/4;
+
+    vm.warp(startAt);
+    twabController.mint(alice, 1000e18);
 
     uint result1 = twabController.getTwabBetween(address(this), alice, startAt, endAt);
 
@@ -319,18 +265,41 @@ contract TwabControllerTest is BaseTest {
     uint result2 = twabController.getTwabBetween(address(this), alice, startAt, endAt);
 
     assertEq(result1, result2);
+
+    vm.warp(afterEndAt + PERIOD_LENGTH);
+
+    uint result3 = twabController.getTwabBetween(address(this), alice, startAt, endAt);
+
+    assertEq(result3, result2);
+  }
+
+  function testZeroTotalSupply() public {
+    vm.warp(PERIOD_OFFSET);
+    twabController.mint(alice, 1000e18);
+
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH/2 + 10);
+    twabController.mint(bob, 1000e18);
+
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2);
+
+    assertEq(
+      twabController.getTwabBetween(address(this), alice, PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH/2),
+      twabController.getTotalSupplyTwabBetween(address(this), PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH/2)
+    );
   }
 
   function testGetTotalSupplyAt_init() public {
-    assertEq(twabController.getTotalSupplyAt(mockVault, uint32(block.timestamp)), 0);
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
+    assertEq(twabController.getTotalSupplyAt(mockVault, uint32(PERIOD_OFFSET)), 0);
   }
 
   function testGetTotalSupplyAt_nonZero() public {
     uint96 _mintAmount = 1000e18;
     vm.startPrank(mockVault);
+    vm.warp(PERIOD_OFFSET);
     twabController.mint(alice, _mintAmount);
-    vm.warp(block.timestamp + PERIOD_LENGTH);
-    assertEq(twabController.getTotalSupplyAt(mockVault, uint32(block.timestamp)), _mintAmount);
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
+    assertEq(twabController.getTotalSupplyAt(mockVault, uint32(PERIOD_OFFSET)), _mintAmount);
   }
 
   function testTotalSupply() public {
@@ -856,6 +825,8 @@ contract TwabControllerTest is BaseTest {
     ObservationInfo[] memory testObservations = new ObservationInfo[](5);
     testObservations[0] = ObservationInfo(t0, amount, 0);
     testObservations[1] = ObservationInfo(t1 + 100, amount, 1);
+
+    // now into t2, and all observations within t2 should collapse
     testObservations[2] = ObservationInfo(t2, amount, 2);
     testObservations[3] = ObservationInfo(t2 + (periodTenth * 8), amount, 2);
     testObservations[4] = ObservationInfo(t2 + (periodTenth * 9), amount, 2);
@@ -867,8 +838,8 @@ contract TwabControllerTest is BaseTest {
     assertEq(account.observations[1].cumulativeBalance, 86500e18, "second obs has 1 period of prev bal");
     assertEq(account.observations[1].timestamp, t1 + 100, "second obs has 1 period of prev bal");
 
-    assertEq(account.observations[2].cumulativeBalance, 501020e18, "third period has last three obs");
-    assertEq(account.observations[2].timestamp, t2 + (periodTenth * 9), "third period has latest timestamp");
+    assertEq(account.observations[2].cumulativeBalance, 501020e18, "third period includes three obs");
+    assertEq(account.observations[2].timestamp, t2 + (periodTenth * 9), "third period has last timestamp");
 
     (uint16 index, ObservationLib.Observation memory twab) = twabController.getNewestObservation(
       mockVault,
@@ -917,6 +888,8 @@ contract TwabControllerTest is BaseTest {
     assertEq(oldestObservation.cumulativeBalance, 86400000e18);
     assertEq(oldestObservation.timestamp, PERIOD_OFFSET + PERIOD_LENGTH);
     assertEq(oldestIndex, 1);
+
+    vm.warp(newestObservation.timestamp + PERIOD_LENGTH);
 
     uint256 aliceTwab = twabController.getTwabBetween(
       mockVault,
@@ -1020,8 +993,8 @@ contract TwabControllerTest is BaseTest {
     uint32 drawStart = PERIOD_OFFSET;
     uint32 drawEnd = drawStart + (PERIOD_LENGTH * 24); // Assume 24 periods in a day for testing purposes.
 
+    vm.warp(drawEnd + PERIOD_LENGTH);
     // Store actual balance during draw N at the end of draw N+1
-    vm.warp(drawEnd + 1 seconds);
     uint256 actualDrawBalance = twabController.getTwabBetween(mockVault, alice, drawStart, drawEnd);
 
     // "Flash loan" deposit immediately at draw start
@@ -1032,13 +1005,13 @@ contract TwabControllerTest is BaseTest {
     // The flash loan will only be counted for the period of time it was held. Since all of this happens in the same block it will not be captured.
     burnAndValidate(mockVault, alice, ObservationInfo(drawStart, largeAmount, 0));
 
-    // Store manipulated balance during draw N at the end of draw N+1
-    vm.warp(drawEnd + 1 seconds);
+    vm.warp(drawEnd + PERIOD_LENGTH*3);
+
     uint256 manipulatedDrawBalance = twabController.getTwabBetween(
       mockVault,
       alice,
       drawStart,
-      drawEnd
+      drawEnd + PERIOD_LENGTH*2
     );
 
     assertEq(manipulatedDrawBalance, actualDrawBalance);
@@ -1084,9 +1057,9 @@ contract TwabControllerTest is BaseTest {
     assertEq(twabController.getTimestampPeriod(PERIOD_OFFSET + (PERIOD_LENGTH * 2)), 3);
   }
 
-  /* ============ isDuringOverwritePeriod ============ */
-  function testisDuringOverwritePeriod() external {
+  /* ============ hasFinalized ============ */
+  function testhasFinalized() external {
     vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
-    assertTrue(twabController.isDuringOverwritePeriod(PERIOD_OFFSET));
+    assertTrue(twabController.hasFinalized(PERIOD_OFFSET));
   }
 }

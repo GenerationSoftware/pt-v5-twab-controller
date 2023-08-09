@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.19;
 
+import "forge-std/console2.sol";
+
 import "ring-buffer-lib/RingBufferLib.sol";
 
 import "./OverflowSafeComparatorLib.sol";
@@ -18,6 +20,16 @@ error BalanceLTAmount(uint112 balance, uint96 amount, string message);
 /// @param delegateAmount The amount being decreased from the account's delegate balance
 /// @param message An additional message describing the error
 error DelegateBalanceLTAmount(uint112 delegateBalance, uint96 delegateAmount, string message);
+
+/// @notice Emitted when a request is made for a twab that is not yet finalized.
+/// @param timestamp The requested timestamp
+/// @param currentOverwritePeriodStartedAt The current overwrite period start time
+error TimestampNotFinalized(uint256 timestamp, uint256 currentOverwritePeriodStartedAt);
+
+/// @notice Emitted when a TWAB time range start is after the end.
+/// @param start The start time
+/// @param end The end time
+error InvalidTimeRange(uint256 start, uint256 end);
 
 /**
  * @title  PoolTogether V5 TwabLib (Library)
@@ -258,7 +270,7 @@ library TwabLib {
   /**
    * @notice Looks up a users balance at a specific time in the past. Ignores any updates during the current overwrite period.
    * @dev If the time is not an exact match of an observation, the balance is extrapolated using the previous observation.
-   * @dev Ensure timestamps are safe using isDuringOverwritePeriod or by ensuring you're querying a multiple of the observation period intervals.
+   * @dev Ensure timestamps are safe using hasFinalized or by ensuring you're querying a multiple of the observation period intervals.
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
@@ -273,13 +285,15 @@ library TwabLib {
     AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) internal view returns (uint256) {
-    uint32 overwritePeriodStartTime = _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
-    uint32 safeTargetTime = _targetTime < overwritePeriodStartTime ? _targetTime : overwritePeriodStartTime - 1;
+    uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
+    if (_targetTime >= overwritePeriodStartTime) {
+      revert TimestampNotFinalized(_targetTime, overwritePeriodStartTime);
+    }
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      safeTargetTime
+      _targetTime
     );
     return prevOrAtObservation.balance;
   }
@@ -304,44 +318,46 @@ library TwabLib {
     uint32 _endTime
   ) internal view returns (uint256) {
     // The current period can still be changed; so the start of the period marks the beginning of unsafe timestamps.
-    uint32 overwritePeriodStartTime = _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
-
-    // The start time must be older than the current period start time, so that it cannot be changed.
-    uint32 safeStartTime = _startTime < overwritePeriodStartTime ? _startTime : overwritePeriodStartTime - 1;
+    uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
+    if (_endTime >= overwritePeriodStartTime) {
+      revert TimestampNotFinalized(_endTime, overwritePeriodStartTime);
+    }
+    if (_startTime > _endTime) {
+      revert InvalidTimeRange(_startTime, _endTime);
+    }
 
     ObservationLib.Observation memory startObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      safeStartTime
+      _startTime
     );
 
-    // The end time must be older than the current period start time, so that it cannot be changed.
-    uint32 safeEndTime = _endTime < overwritePeriodStartTime ? _endTime : overwritePeriodStartTime - 1;
-
-    if (safeEndTime == safeStartTime) {
+    if (_endTime == _startTime) {
       return startObservation.balance;
     }
+
+    uint32 periodEndTime = getPeriodEndTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, _endTime);
 
     ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      safeEndTime
+      periodEndTime
     );
 
-    if (startObservation.timestamp != safeEndTime) {
-      startObservation = _calculateTemporaryObservation(startObservation, safeStartTime);
+    if (startObservation.timestamp != _endTime) {
+      startObservation = _calculateTemporaryObservation(startObservation, _startTime);
     }
 
-    if (endObservation.timestamp != safeEndTime) {
-      endObservation = _calculateTemporaryObservation(endObservation, safeEndTime);
+    if (endObservation.timestamp != _endTime) {
+      endObservation = _calculateTemporaryObservation(endObservation, _endTime);
     }
 
     // Difference in amount / time
     return
       (endObservation.cumulativeBalance - startObservation.cumulativeBalance) /
-      (safeEndTime - safeStartTime);
+      (_endTime - _startTime);
   }
 
   /**
@@ -354,7 +370,7 @@ library TwabLib {
   function _calculateTemporaryObservation(
     ObservationLib.Observation memory _prevObservation,
     uint32 _time
-  ) private pure returns (ObservationLib.Observation memory) {
+  ) private view returns (ObservationLib.Observation memory) {
     return
       ObservationLib.Observation({
         balance: _prevObservation.balance,
@@ -422,13 +438,29 @@ library TwabLib {
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
    */
-  function _overwritePeriodStartTime(
+  function _currentOverwritePeriodStartedAt(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET
   ) private view returns (uint32) {
-    uint32 currentTime = uint32(block.timestamp);
-    uint32 currentPeriod = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, currentTime);
-    return getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, currentPeriod);
+    return getPeriodStartTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, uint32(block.timestamp));
+  }
+
+  function getPeriodStartTimeWithTimestamp(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 timestamp
+  ) internal pure returns (uint32) {
+    uint32 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, timestamp);
+    return getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
+  }
+
+  function getPeriodEndTimeWithTimestamp(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 timestamp
+  ) internal pure returns (uint32) {
+    uint32 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, timestamp);
+    return getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
   }
 
   /**
@@ -440,12 +472,20 @@ library TwabLib {
   function _extrapolateFromBalance(
     ObservationLib.Observation memory _observation,
     uint32 _timestamp
-  ) private pure returns (uint128 cumulativeBalance) {
-    // new cumulative balance = provided cumulative balance (or zero) + (current balance * elapsed seconds)
-    return
-      _observation.cumulativeBalance +
-      uint128(_observation.balance) *
-      (_timestamp.checkedSub(_observation.timestamp, _timestamp));
+  ) private view returns (uint128 cumulativeBalance) {
+    if (_timestamp < _observation.timestamp) {
+      // if before, then linearly extrapolate backwards
+      return
+        _observation.cumulativeBalance -
+        uint128(_observation.balance) *
+        (_observation.timestamp.checkedSub(_timestamp, uint32(block.timestamp)));
+    } else {
+      // if after, then linearly extrapolate forwards
+      return
+        _observation.cumulativeBalance +
+        uint128(_observation.balance) *
+        (_timestamp.checkedSub(_observation.timestamp, uint32(block.timestamp)));
+    }
   }
 
   /**
@@ -470,11 +510,11 @@ library TwabLib {
    * @param PERIOD_OFFSET The offset of the first period
    * @return The start time for the current overwrite period.
    */
-  function currentOverwritePeriodStartTime(
+  function currentOverwritePeriodStartedAt(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET
   ) internal view returns (uint32) {
-    return _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
+    return _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
   /**
@@ -516,6 +556,25 @@ library TwabLib {
     }
 
     return (_period - 1) * PERIOD_LENGTH + PERIOD_OFFSET;
+  }
+
+  /**
+   * @notice Calculates the last timestamp for a period
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
+   * @param _period The period to check
+   * @return _timestamp The timestamp at which the period ends
+   */
+  function getPeriodEndTime(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _period
+  ) internal pure returns (uint32) {
+    if (_period == 0) {
+      return PERIOD_OFFSET - 1;
+    }
+
+    return _period * PERIOD_LENGTH + PERIOD_OFFSET - 1;
   }
 
   /**
@@ -611,12 +670,12 @@ library TwabLib {
    * @param _time The timestamp to check
    * @return isSafe Whether or not the timestamp is safe
    */
-  function isDuringOverwritePeriod(
+  function hasFinalized(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET,
     uint32 _time
   ) internal view returns (bool) {
-    return _isDuringOverwritePeriod(PERIOD_LENGTH, PERIOD_OFFSET, _time);
+    return _hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _time);
   }
 
   /**
@@ -627,11 +686,11 @@ library TwabLib {
    * @param _time The timestamp to check
    * @return isSafe Whether or not the timestamp is safe
    */
-  function _isDuringOverwritePeriod(
+  function _hasFinalized(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET,
     uint32 _time
   ) private view returns (bool) {
-    return _time < _overwritePeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET);
+    return _time < _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 }

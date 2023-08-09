@@ -364,12 +364,21 @@ contract TwabController {
   }
 
   /**
-   * @notice Checks if the given timestamp occurs during the current overwrite period.
+   * @notice Checks if the given timestamp is before the current overwrite period.
    * @param time The timestamp to check
-   * @return isSafe Whether or not the timestamp is safe
+   * @return True if the given time is finalized, false if it's during the current overwrite period.
    */
-  function isDuringOverwritePeriod(uint32 time) external view returns (bool) {
-    return TwabLib.isDuringOverwritePeriod(PERIOD_LENGTH, PERIOD_OFFSET, time);
+  function hasFinalized(uint32 time) external view returns (bool) {
+    return TwabLib.hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, time);
+  }
+
+  /**
+   * @notice Computes the timestamp at which the current overwrite period started.
+   * The overwrite period is the period during which observations are collated.
+   * @return period The timestamp at which the current overwrite period started.
+   */
+  function currentOverwritePeriodStartedAt() external view returns (uint32) {
+    return TwabLib.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
   /* ============ External Write Functions ============ */
