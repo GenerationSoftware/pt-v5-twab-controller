@@ -669,6 +669,20 @@ contract TwabControllerTest is BaseTest {
     vm.stopPrank();
   }
 
+  function testDelegate_interpretBurnAddressAsSponsorship() external {
+    uint96 _amount = 1000e18;
+    twabController.mint(alice, _amount);
+    vm.startPrank(alice);
+    twabController.delegate(address(this), address(0));
+    assertEq(twabController.totalSupplyDelegateBalance(address(this)), 0);
+    assertEq(twabController.delegateBalanceOf(address(this), bob), 0);
+    assertEq(twabController.delegateBalanceOf(address(this), alice), 0);
+    twabController.delegate(address(this), bob);
+    assertEq(twabController.totalSupplyDelegateBalance(address(this)), _amount);
+    assertEq(twabController.delegateBalanceOf(address(this), bob), _amount);
+    assertEq(twabController.delegateBalanceOf(address(this), alice), 0);
+  }
+
   function testDelegateToSponsorship() external {
     address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
 
