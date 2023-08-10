@@ -284,11 +284,7 @@ library TwabLib {
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint32 _targetTime
-  ) internal view returns (uint256) {
-    uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
-    if (_targetTime >= overwritePeriodStartTime) {
-      revert TimestampNotFinalized(_targetTime, overwritePeriodStartTime);
-    }
+  ) internal requireFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _targetTime) view returns (uint256) {
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
@@ -316,13 +312,8 @@ library TwabLib {
     AccountDetails memory _accountDetails,
     uint32 _startTime,
     uint32 _endTime
-  ) internal view returns (uint256) {
-    // The current period can still be changed; so the start of the period marks the beginning of unsafe timestamps.
-    uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
-    if (_endTime >= overwritePeriodStartTime) {
-      revert TimestampNotFinalized(_endTime, overwritePeriodStartTime);
-    }
-    if (_startTime > _endTime) {
+  ) internal view requireFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _endTime) returns (uint256) {
+    if (_startTime >= _endTime) {
       revert InvalidTimeRange(_startTime, _endTime);
     }
 
@@ -333,17 +324,11 @@ library TwabLib {
       _startTime
     );
 
-    if (_endTime == _startTime) {
-      return startObservation.balance;
-    }
-
-    uint32 periodEndTime = getPeriodEndTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, _endTime);
-
     ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
-      periodEndTime
+      _endTime
     );
 
     if (startObservation.timestamp != _endTime) {
@@ -421,7 +406,7 @@ library TwabLib {
     // TODO: Could skip this check for period 0 if we're sure that the PERIOD_OFFSET is in the past.
     // Create a new Observation if the current time falls within a new period
     // Or if the timestamp is the initial period.
-    if (currentPeriod == 0 || currentPeriod > newestObservationPeriod) {
+    if (_accountDetails.cardinality == 0 || currentPeriod > newestObservationPeriod) {
       return (
         uint16(RingBufferLib.wrap(_accountDetails.nextObservationIndex, MAX_CARDINALITY)),
         newestObservation,
@@ -536,7 +521,7 @@ library TwabLib {
     }
     // Shrink by 1 to ensure periods end on a multiple of PERIOD_LENGTH.
     // Increase by 1 to start periods at # 1.
-    return (_timestamp - PERIOD_OFFSET) / PERIOD_LENGTH + 1;
+    return (_timestamp - PERIOD_OFFSET) / PERIOD_LENGTH;
   }
 
   /**
@@ -551,11 +536,7 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     uint32 _period
   ) internal pure returns (uint32) {
-    if (_period == 0) {
-      return 0;
-    }
-
-    return (_period - 1) * PERIOD_LENGTH + PERIOD_OFFSET;
+    return _period * PERIOD_LENGTH + PERIOD_OFFSET;
   }
 
   /**
@@ -570,11 +551,7 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     uint32 _period
   ) internal pure returns (uint32) {
-    if (_period == 0) {
-      return PERIOD_OFFSET - 1;
-    }
-
-    return _period * PERIOD_LENGTH + PERIOD_OFFSET - 1;
+    return (_period+1) * PERIOD_LENGTH + PERIOD_OFFSET;
   }
 
   /**
@@ -691,6 +668,16 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     uint32 _time
   ) private view returns (bool) {
-    return _time < _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
+    return _time <= _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
+  }
+
+  modifier requireFinalized(uint32 PERIOD_LENGTH, uint32 PERIOD_OFFSET, uint256 _timestamp) {
+    // The current period can still be changed; so the start of the period marks the beginning of unsafe timestamps.
+    uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
+    // timestamp == overwritePeriodStartTime doesn't matter, because the cumulative balance won't be impacted
+    if (_timestamp > overwritePeriodStartTime) {
+      revert TimestampNotFinalized(_timestamp, overwritePeriodStartTime);
+    }
+    _;
   }
 }

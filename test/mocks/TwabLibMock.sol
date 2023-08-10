@@ -119,12 +119,17 @@ contract TwabLibMock {
   }
 
   function getPeriodStartTime(
-    uint32 PERIOD_LENGTH,
-    uint32 PERIOD_OFFSET,
     uint32 _period
-  ) external pure returns (uint32) {
+  ) external view returns (uint32) {
     uint32 start = TwabLib.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
     return start;
+  }
+
+  function getPeriodEndTime(
+    uint32 _period
+  ) external view returns (uint32) {
+    uint32 end = TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
+    return end;
   }
 
   function currentOverwritePeriodStartedAt(

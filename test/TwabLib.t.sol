@@ -3,7 +3,12 @@ pragma solidity ^0.8.19;
 
 import { console2 } from "forge-std/console2.sol";
 
-import { TwabLib, BalanceLTAmount, DelegateBalanceLTAmount } from "../src/libraries/TwabLib.sol";
+import {
+  TwabLib,
+  BalanceLTAmount,
+  DelegateBalanceLTAmount,
+  TimestampNotFinalized  
+} from "../src/libraries/TwabLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 
 import { BaseTest } from "./utils/BaseTest.sol";
@@ -625,14 +630,6 @@ contract TwabLibTest is BaseTest {
     twabLibMock.increaseBalances(0, 1000e18);
   }
 
-  function testGetPeriodStartTime_before() public {
-    assertEq(twabLibMock.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, 0), 0);
-  }
-
-  function testGetPeriodStartTime_normal() public {
-    assertEq(twabLibMock.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, 2), PERIOD_OFFSET + PERIOD_LENGTH);
-  }
-
   function testcurrentOverwritePeriodStartedAt_atStart() public {
     assertEq(twabLibMock.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
   }
@@ -658,6 +655,14 @@ contract TwabLibTest is BaseTest {
     uint256 _balance = twabLibMock.getBalanceAt(_initialTimestamp - 1);
 
     assertEq(_balance, 0);
+  }
+
+  function testGetBalanceAt_withinCurrentPeriodInvalid() public {
+    // Half way through a period.
+    vm.warp(PERIOD_OFFSET + (PERIOD_LENGTH / 2));
+
+    vm.expectRevert(abi.encodeWithSelector(TimestampNotFinalized.selector, PERIOD_OFFSET+10, PERIOD_OFFSET));
+    twabLibMock.getBalanceAt(PERIOD_OFFSET+10);
   }
 
   function testGetTwab_MaxBalance() public {
@@ -878,38 +883,53 @@ contract TwabLibTest is BaseTest {
   }
 
   function testGetTimestampPeriod_first() public {
-    assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET), 1);
-    assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET + 1 seconds), 1);
+    assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET), 0);
+    assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET + 1 seconds), 0);
   }
 
   function testGetTimestampPeriod_second() public {
-    assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET + PERIOD_LENGTH), 2);
+    assertEq(twabLibMock.getTimestampPeriod(PERIOD_OFFSET + PERIOD_LENGTH), 1);
+  }
+
+  function testGetPeriodStartTime_before() public {
+    assertEq(twabLibMock.getPeriodStartTime(0), PERIOD_OFFSET);
+  }
+
+  function testGetPeriodStartTime_normal() public {
+    assertEq(twabLibMock.getPeriodStartTime(1), PERIOD_OFFSET + PERIOD_LENGTH);
+  }
+
+  function testGetPeriodStartTime_two() public {
+    assertEq(twabLibMock.getPeriodStartTime(2), PERIOD_OFFSET + PERIOD_LENGTH*2);
+  }
+
+  function testGetPeriodEndTime_zero() public {
+    assertEq(twabLibMock.getPeriodEndTime(0), PERIOD_OFFSET + PERIOD_LENGTH);
   }
 
   // ================== hasFinalized ==================
 
-  function testhasFinalized_beforeStart() public {
+  function testHasFinalized_withinOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET);
-    assertTrue(twabLibMock.hasFinalized(PERIOD_OFFSET-1));
+    assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET+1));
   }
-
-  function testhasFinalized_startOfOverwritePeriod() public {
-    vm.warp(PERIOD_OFFSET);
-    assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET));
-  }
-
-  function testhasFinalized_endOfOverwritePeriod() public {
+  function testHasFinalized_endOfOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET);
     assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET + PERIOD_LENGTH - 1));
   }
 
-  function testhasFinalized_afterOverwritePeriod() public {
+  function testHasFinalized_afterOverwritePeriod() public {
     vm.warp(PERIOD_OFFSET);
     assertFalse(twabLibMock.hasFinalized(PERIOD_OFFSET + PERIOD_LENGTH));
   }
 
-  function testhasFinalized_beforeOverwritePeriod() public {
-    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
+  function testHasFinalized_beforeOverwritePeriod() public {
+    vm.warp(PERIOD_OFFSET);
+    assertTrue(twabLibMock.hasFinalized(PERIOD_OFFSET-1));
+  }
+
+  function testHasFinalized_startOfOverwritePeriod() public {
+    vm.warp(PERIOD_OFFSET);
     assertTrue(twabLibMock.hasFinalized(PERIOD_OFFSET));
   }
 

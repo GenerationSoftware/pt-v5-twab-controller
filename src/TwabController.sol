@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import "forge-std/console2.sol";
+
 import { TwabLib } from "./libraries/TwabLib.sol";
 import { ObservationLib } from "./libraries/ObservationLib.sol";
 
@@ -232,7 +234,8 @@ contract TwabController {
     uint32 targetTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, targetTime);
+    uint32 snappedTargetTime = TwabLib.getPeriodStartTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, targetTime);
+    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, snappedTargetTime);
   }
 
   /**
@@ -243,7 +246,8 @@ contract TwabController {
    */
   function getTotalSupplyAt(address vault, uint32 targetTime) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, targetTime);
+    uint32 snappedTargetTime = TwabLib.getPeriodStartTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, targetTime);
+    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, snappedTargetTime);
   }
 
   /**
@@ -262,14 +266,18 @@ contract TwabController {
     uint32 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
+    // we snap the timestamps to period starts because the total supply records will be sparsely populated.
+    // if two users update during a period, then the total supply observation will only exist for the last one.
+    console2.log("getTwabBetween _snapTimestamp(startTime)", _snapTimestamp(startTime));
+    console2.log("getTwabBetween _snapTimestamp(endTime)", _snapTimestamp(endTime));
     return
       TwabLib.getTwabBetween(
         PERIOD_LENGTH,
         PERIOD_OFFSET,
         _account.observations,
         _account.details,
-        startTime,
-        endTime
+        _snapTimestamp(startTime),
+        _snapTimestamp(endTime)
       );
   }
 
@@ -287,15 +295,41 @@ contract TwabController {
     uint32 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
+    // we snap the timestamps to period starts because the total supply records will be sparsely populated.
+    // if two users update during a period, then the total supply observation will only exist for the last one.
     return
       TwabLib.getTwabBetween(
         PERIOD_LENGTH,
         PERIOD_OFFSET,
         _account.observations,
         _account.details,
-        startTime,
-        endTime
+        _snapTimestamp(startTime),
+        _snapTimestamp(endTime)
       );
+  }
+
+  /**
+   * @notice Computes the start time of the period in which the given timestamp falls.
+   * @param _timestamp The timestamp to compute the period start time for
+   * @return The start time of the period in which the given timestamp falls
+   */
+  function snapTimestamp(uint32 _timestamp) external view returns (uint32) {
+    return _snapTimestamp(_timestamp);
+  }
+
+  /**
+   * @notice Computes the start time of the period in which the given timestamp falls.
+   * @param _timestamp The timestamp to compute the period start time for
+   * @return The start time of the period in which the given timestamp falls
+   */
+  function _snapTimestamp(uint32 _timestamp) internal view returns (uint32) {
+    if (_timestamp < PERIOD_OFFSET) {
+      return PERIOD_OFFSET;
+    }
+    if ((_timestamp - PERIOD_OFFSET) % PERIOD_LENGTH == 0) {
+      return _timestamp;
+    }
+    return TwabLib.getPeriodEndTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
   }
 
   /**
