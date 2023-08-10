@@ -262,7 +262,7 @@ contract TwabController {
     uint32 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    // we snap the timestamps to period starts because the total supply records will be sparsely populated.
+    // We snap the timestamps to the period end on or after the timestamp because the total supply records will be sparsely populated.
     // if two users update during a period, then the total supply observation will only exist for the last one.
     return
       TwabLib.getTwabBetween(
@@ -289,7 +289,7 @@ contract TwabController {
     uint32 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    // we snap the timestamps to period starts because the total supply records will be sparsely populated.
+    // We snap the timestamps to the period end on or after the timestamp because the total supply records will be sparsely populated.
     // if two users update during a period, then the total supply observation will only exist for the last one.
     return
       TwabLib.getTwabBetween(
