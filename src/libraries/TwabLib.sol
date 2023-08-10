@@ -401,9 +401,7 @@ library TwabLib {
       newestObservation.timestamp
     );
 
-    // TODO: Could skip this check for period 0 if we're sure that the PERIOD_OFFSET is in the past.
-    // Create a new Observation if the current time falls within a new period
-    // Or if the timestamp is the initial period.
+    // Create a new Observation if it's the first period or the current time falls within a new period
     if (_accountDetails.cardinality == 0 || currentPeriod > newestObservationPeriod) {
       return (
         uint16(RingBufferLib.wrap(_accountDetails.nextObservationIndex, MAX_CARDINALITY)),
