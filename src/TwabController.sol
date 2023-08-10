@@ -312,9 +312,9 @@ contract TwabController {
   }
 
   /**
-   * @notice Computes the start time of the period in which the given timestamp falls.
-   * @param _timestamp The timestamp to compute the period start time for
-   * @return The start time of the period in which the given timestamp falls
+   * @notice Computes the period end timestamp on or after the given timestamp.
+   * @param _timestamp The timestamp to compute the period end time for
+   * @return A period end time.
    */
   function _periodEndOnOrAfter(uint32 _timestamp) internal view returns (uint32) {
     if (_timestamp < PERIOD_OFFSET) {
