@@ -323,7 +323,8 @@ contract TwabController {
     if ((_timestamp - PERIOD_OFFSET) % PERIOD_LENGTH == 0) {
       return _timestamp;
     }
-    return TwabLib.getPeriodEndTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
+    uint32 period = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
+    return TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
   }
 
   /**

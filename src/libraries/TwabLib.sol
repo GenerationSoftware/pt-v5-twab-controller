@@ -266,9 +266,9 @@ library TwabLib {
   }
 
   /**
-   * @notice Looks up a users balance at a specific time in the past. Ignores any updates during the current overwrite period.
+   * @notice Looks up a users balance at a specific time in the past. The time must be before the current overwrite period.
    * @dev If the time is not an exact match of an observation, the balance is extrapolated using the previous observation.
-   * @dev Ensure timestamps are safe using hasFinalized or by ensuring you're querying a multiple of the observation period intervals.
+   * @dev Ensure timestamps are safe using hasFinalized
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
@@ -293,7 +293,7 @@ library TwabLib {
   }
 
   /**
-   * @notice Looks up a users TWAB for a time range. Ignores any updates during the current overwrite period.
+   * @notice Looks up a users TWAB for a time range. The time must be before the current overwrite period.
    * @dev If the timestamps in the range are not exact matches of observations, the balance is extrapolated using the previous observation.
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
@@ -329,7 +329,7 @@ library TwabLib {
       _endTime
     );
 
-    if (startObservation.timestamp != _endTime) {
+    if (startObservation.timestamp != _startTime) {
       startObservation = _calculateTemporaryObservation(startObservation, _startTime);
     }
 
@@ -417,33 +417,17 @@ library TwabLib {
   }
 
   /**
-   * @notice Computes the start time of the current period
+   * @notice Computes the start time of the current overwrite period
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
+   * @return The start time of the current overwrite period
    */
   function _currentOverwritePeriodStartedAt(
     uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET
   ) private view returns (uint32) {
-    return getPeriodStartTimeWithTimestamp(PERIOD_LENGTH, PERIOD_OFFSET, uint32(block.timestamp));
-  }
-
-  function getPeriodStartTimeWithTimestamp(
-    uint32 PERIOD_LENGTH,
-    uint32 PERIOD_OFFSET,
-    uint32 timestamp
-  ) internal pure returns (uint32) {
-    uint32 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, timestamp);
+    uint32 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, uint32(block.timestamp));
     return getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
-  }
-
-  function getPeriodEndTimeWithTimestamp(
-    uint32 PERIOD_LENGTH,
-    uint32 PERIOD_OFFSET,
-    uint32 timestamp
-  ) internal pure returns (uint32) {
-    uint32 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, timestamp);
-    return getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
   }
 
   /**
@@ -456,19 +440,11 @@ library TwabLib {
     ObservationLib.Observation memory _observation,
     uint32 _timestamp
   ) private view returns (uint128 cumulativeBalance) {
-    if (_timestamp < _observation.timestamp) {
-      // if before, then linearly extrapolate backwards
-      return
-        _observation.cumulativeBalance -
-        uint128(_observation.balance) *
-        (_observation.timestamp.checkedSub(_timestamp, uint32(block.timestamp)));
-    } else {
-      // if after, then linearly extrapolate forwards
-      return
-        _observation.cumulativeBalance +
-        uint128(_observation.balance) *
-        (_timestamp.checkedSub(_observation.timestamp, uint32(block.timestamp)));
-    }
+    // new cumulative balance = provided cumulative balance (or zero) + (current balance * elapsed seconds)
+    return
+      _observation.cumulativeBalance +
+      uint128(_observation.balance) *
+      (_timestamp.checkedSub(_observation.timestamp, uint32(block.timestamp)));
   }
 
   /**
@@ -502,8 +478,7 @@ library TwabLib {
 
   /**
    * @notice Calculates the period a timestamp falls within.
-   * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0. PERIOD_OFFSET + 1 seconds is the start of period 1.
-   * @dev All timestamps landing on multiples of PERIOD_LENGTH are the ends of periods.
+   * @dev Timestamp prior to the PERIOD_OFFSET are considered to be in period 0.
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
    * @param _timestamp The timestamp to calculate the period for
@@ -514,11 +489,9 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     uint32 _timestamp
   ) private pure returns (uint32 period) {
-    if (_timestamp < PERIOD_OFFSET) {
+    if (_timestamp <= PERIOD_OFFSET) {
       return 0;
     }
-    // Shrink by 1 to ensure periods end on a multiple of PERIOD_LENGTH.
-    // Increase by 1 to start periods at # 1.
     return (_timestamp - PERIOD_OFFSET) / PERIOD_LENGTH;
   }
 
@@ -655,7 +628,7 @@ library TwabLib {
 
   /**
    * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
-   * @dev A timestamp is safe if it is before the current overwrite period
+   * @dev A timestamp is safe if it is on or before the current overwrite period start time
    * @param PERIOD_LENGTH The period length to use to calculate the period
    * @param PERIOD_OFFSET The period offset to use to calculate the period
    * @param _time The timestamp to check
@@ -666,9 +639,16 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     uint32 _time
   ) private view returns (bool) {
+    // It's safe if equal to the overwrite period start time, because the cumulative balance won't be impacted
     return _time <= _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
+  /**
+   * @notice Checks if the given timestamp is safe to perform a historic balance lookup on.
+   * @param PERIOD_LENGTH The period length to use to calculate the period
+   * @param PERIOD_OFFSET The period offset to use to calculate the period
+   * @param _timestamp The timestamp to check
+   */
   modifier requireFinalized(uint32 PERIOD_LENGTH, uint32 PERIOD_OFFSET, uint256 _timestamp) {
     // The current period can still be changed; so the start of the period marks the beginning of unsafe timestamps.
     uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
