@@ -4,7 +4,11 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 
-import { TwabController, SameDelegateAlreadySet } from "../src/TwabController.sol";
+import {
+  TwabController,
+  SameDelegateAlreadySet,
+  CannotTransferToSponsorshipAddress
+} from "../src/TwabController.sol";
 import {
   TwabLib,
   TimestampNotFinalized,
@@ -599,6 +603,13 @@ contract TwabControllerTest is BaseTest {
     assertEq(twabController.delegateBalanceOf(mockVault, charlie), _amount);
 
     vm.stopPrank();
+  }
+
+  function testTransfer_rejectSponsorshipAddress() public {
+    twabController.mint(alice, 100e18);
+    address sponsorship = twabController.SPONSORSHIP_ADDRESS();
+    vm.expectRevert(abi.encodeWithSelector(CannotTransferToSponsorshipAddress.selector));
+    twabController.transfer(alice, sponsorship, 100e18);
   }
 
   /* ============ delegate ============ */

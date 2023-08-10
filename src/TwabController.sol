@@ -7,6 +7,9 @@ import { ObservationLib } from "./libraries/ObservationLib.sol";
 /// @notice Emitted when an account already points to the same delegate address that is being set
 error SameDelegateAlreadySet(address delegate);
 
+/// @notice Emitted when an account tries to transfer to the sponsorship address
+error CannotTransferToSponsorshipAddress();
+
 /**
  * @title  Time-Weighted Average Balance Controller
  * @author PoolTogether Inc.
@@ -479,6 +482,10 @@ contract TwabController {
    * @param _amount the amount of balance being transferred
    */
   function _transferBalance(address _vault, address _from, address _to, uint96 _amount) internal {
+    if (_to == SPONSORSHIP_ADDRESS) {
+      revert CannotTransferToSponsorshipAddress();
+    }
+
     if (_from == _to) {
       return;
     }
