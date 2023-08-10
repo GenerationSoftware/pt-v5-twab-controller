@@ -96,24 +96,24 @@ contract TwabControllerTest is BaseTest {
     }
   }
 
-  function testSnapTimestamp_beforeOffset() public {
-    assertEq(twabController.snapTimestamp(PERIOD_OFFSET-1), PERIOD_OFFSET);
+  function testperiodEndOnOrAfter_beforeOffset() public {
+    assertEq(twabController.periodEndOnOrAfter(PERIOD_OFFSET-1), PERIOD_OFFSET);
   }
 
-  function testSnapTimestamp_atOffset() public {
-    assertEq(twabController.snapTimestamp(PERIOD_OFFSET), PERIOD_OFFSET);
+  function testperiodEndOnOrAfter_atOffset() public {
+    assertEq(twabController.periodEndOnOrAfter(PERIOD_OFFSET), PERIOD_OFFSET);
   }
 
-  function testSnapTimestamp_midPeriod() public {
-    assertEq(twabController.snapTimestamp(PERIOD_OFFSET + PERIOD_LENGTH/2), PERIOD_OFFSET + PERIOD_LENGTH);
+  function testperiodEndOnOrAfter_midPeriod() public {
+    assertEq(twabController.periodEndOnOrAfter(PERIOD_OFFSET + PERIOD_LENGTH/2), PERIOD_OFFSET + PERIOD_LENGTH);
   }
 
-  function testSnapTimestamp_firstPeriod() public {
-    assertEq(twabController.snapTimestamp(PERIOD_OFFSET + PERIOD_LENGTH), PERIOD_OFFSET + PERIOD_LENGTH);
+  function testperiodEndOnOrAfter_firstPeriod() public {
+    assertEq(twabController.periodEndOnOrAfter(PERIOD_OFFSET + PERIOD_LENGTH), PERIOD_OFFSET + PERIOD_LENGTH);
   }
 
-  function testSnapTimestamp_secondPeriod() public {
-    assertEq(twabController.snapTimestamp(PERIOD_OFFSET + PERIOD_LENGTH*2), PERIOD_OFFSET + PERIOD_LENGTH*2);
+  function testperiodEndOnOrAfter_secondPeriod() public {
+    assertEq(twabController.periodEndOnOrAfter(PERIOD_OFFSET + PERIOD_LENGTH*2), PERIOD_OFFSET + PERIOD_LENGTH*2);
   }
 
   function testBalanceOf() external {
