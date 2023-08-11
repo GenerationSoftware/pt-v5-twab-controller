@@ -11,6 +11,9 @@ error SameDelegateAlreadySet(address delegate);
 /// @notice Emitted when an account tries to transfer to the sponsorship address
 error CannotTransferToSponsorshipAddress();
 
+/// @notice Emitted when the period length is too short
+error PeriodLengthTooShort(uint32 periodLength, uint32 minimumPeriodLength);
+
 /**
  * @title  Time-Weighted Average Balance Controller
  * @author PoolTogether Inc.
@@ -28,6 +31,9 @@ contract TwabController {
 
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
   address public constant SPONSORSHIP_ADDRESS = address(1);
+  
+  /// @notice The minimum period length
+  uint32 public constant MINIMUM_PERIOD_LENGTH = 1 hours;
 
   /// @notice Sets the minimum period length for Observations. When a period elapses, a new Observation is recorded, otherwise the most recent Observation is updated.
   uint32 public immutable PERIOD_LENGTH;
@@ -146,6 +152,9 @@ contract TwabController {
    *      as line up periods with a chosen timestamp.
    */
   constructor(uint32 _periodLength, uint32 _periodOffset) {
+    if (_periodLength < MINIMUM_PERIOD_LENGTH) {
+      revert PeriodLengthTooShort(_periodLength, MINIMUM_PERIOD_LENGTH);
+    }
     PERIOD_LENGTH = _periodLength;
     PERIOD_OFFSET = _periodOffset;
   }
