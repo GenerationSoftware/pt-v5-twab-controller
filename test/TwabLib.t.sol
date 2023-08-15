@@ -427,6 +427,12 @@ contract TwabLibTest is BaseTest {
     twabLibMock.increaseBalances(0, amount);
   }
 
+  function testGetTwabBetween_start_and_end_same_time() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1000e18);
+    assertEq(twabLibMock.getTwabBetween(PERIOD_OFFSET, PERIOD_OFFSET), 1000e18);
+  }
+
   function testGetTwabBetweenSingleBefore() public {
     (
       uint32 _initialTimestamp,

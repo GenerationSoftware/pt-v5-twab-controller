@@ -312,8 +312,19 @@ library TwabLib {
     uint32 _startTime,
     uint32 _endTime
   ) internal view requireFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _endTime) returns (uint256) {
-    if (_startTime >= _endTime) {
+    if (_startTime > _endTime) {
       revert InvalidTimeRange(_startTime, _endTime);
+    }
+
+    ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
+      PERIOD_OFFSET,
+      _observations,
+      _accountDetails,
+      _endTime
+    );
+
+    if (_startTime == _endTime) {
+      return endObservation.balance;
     }
 
     ObservationLib.Observation memory startObservation = _getPreviousOrAtObservation(
@@ -321,13 +332,6 @@ library TwabLib {
       _observations,
       _accountDetails,
       _startTime
-    );
-
-    ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
-      PERIOD_OFFSET,
-      _observations,
-      _accountDetails,
-      _endTime
     );
 
     if (startObservation.timestamp != _startTime) {
