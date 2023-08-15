@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.19;
 
-import "forge-std/console2.sol";
-
 import "ring-buffer-lib/RingBufferLib.sol";
 
 import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
