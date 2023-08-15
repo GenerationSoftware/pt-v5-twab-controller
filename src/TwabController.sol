@@ -223,27 +223,27 @@ contract TwabController {
    * @notice Looks up a users balance at a specific time in the past.
    * @param vault the vault for which the balance is being queried
    * @param user the user whose balance is being queried
-   * @param targetTime the time in the past for which the balance is being queried
+   * @param periodEndOnOrAfterTime The time in the past for which the balance is being queried. The time will be snapped to a period end time on or after the timestamp.
    * @return The balance of the user at the target time
    */
   function getBalanceAt(
     address vault,
     address user,
-    uint32 targetTime
+    uint32 periodEndOnOrAfterTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, _periodEndOnOrAfter(targetTime));
+    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, _periodEndOnOrAfter(periodEndOnOrAfterTime));
   }
 
   /**
    * @notice Looks up the total supply at a specific time in the past.
    * @param vault the vault for which the total supply is being queried
-   * @param targetTime the time in the past for which the total supply is being queried
+   * @param periodEndOnOrAfterTime The time in the past for which the balance is being queried. The time will be snapped to a period end time on or after the timestamp.
    * @return The total supply at the target time
    */
-  function getTotalSupplyAt(address vault, uint32 targetTime) external view returns (uint256) {
+  function getTotalSupplyAt(address vault, uint32 periodEndOnOrAfterTime) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, _periodEndOnOrAfter(targetTime));
+    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, _periodEndOnOrAfter(periodEndOnOrAfterTime));
   }
 
   /**
@@ -251,8 +251,8 @@ contract TwabController {
    * @dev Timestamps are Unix timestamps denominated in seconds
    * @param vault the vault for which the average balance is being queried
    * @param user the user whose average balance is being queried
-   * @param startTime the start of the time range for which the average balance is being queried
-   * @param endTime the end of the time range for which the average balance is being queried
+   * @param startTime the start of the time range for which the average balance is being queried. The time will be snapped to a period end time on or after the timestamp.
+   * @param endTime the end of the time range for which the average balance is being queried. The time will be snapped to a period end time on or after the timestamp.
    * @return The average balance of the user between the two timestamps
    */
   function getTwabBetween(
@@ -304,8 +304,8 @@ contract TwabController {
 
   /**
    * @notice Computes the period end timestamp on or after the given timestamp.
-   * @param _timestamp The timestamp to compute the period start time for
-   * @return The start time of the period in which the given timestamp falls
+   * @param _timestamp The timestamp to check
+   * @return The end timestamp of the period that ends on or immediately after the given timestamp
    */
   function periodEndOnOrAfter(uint32 _timestamp) external view returns (uint32) {
     return _periodEndOnOrAfter(_timestamp);
@@ -323,8 +323,11 @@ contract TwabController {
     if ((_timestamp - PERIOD_OFFSET) % PERIOD_LENGTH == 0) {
       return _timestamp;
     }
-    uint32 period = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
-    return TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
+    return TwabLib.getPeriodEndTime(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp)
+    );
   }
 
   /**
@@ -403,7 +406,7 @@ contract TwabController {
 
   /**
    * @notice Computes the timestamp at which the current overwrite period started.
-   * The overwrite period is the period during which observations are collated.
+   * @dev The overwrite period is the period during which observations are collated.
    * @return period The timestamp at which the current overwrite period started.
    */
   function currentOverwritePeriodStartedAt() external view returns (uint32) {
