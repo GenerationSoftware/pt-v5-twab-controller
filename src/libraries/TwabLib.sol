@@ -405,7 +405,7 @@ library TwabLib {
     // Create a new Observation if it's the first period or the current time falls within a new period
     if (_accountDetails.cardinality == 0 || currentPeriod > newestObservationPeriod) {
       return (
-        uint16(RingBufferLib.wrap(_accountDetails.nextObservationIndex, MAX_CARDINALITY)),
+        _accountDetails.nextObservationIndex,
         newestObservation,
         true
       );
