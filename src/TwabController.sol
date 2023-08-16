@@ -626,11 +626,14 @@ contract TwabController {
    */
   function _delegate(address _vault, address _from, address _to) internal {
     address _currentDelegate = _delegateOf(_vault, _from);
-    if (_to == _currentDelegate) {
-      revert SameDelegateAlreadySet(_to);
+    // Treat address(0) as un-delegating. They could also pass the sponsorship address, but this lets
+    // them do so without knowing the sponsorship special value address.
+    address to = _to == address(0) ? SPONSORSHIP_ADDRESS : _to;
+    if (to == _currentDelegate) {
+      revert SameDelegateAlreadySet(to);
     }
 
-    delegates[_vault][_from] = _to;
+    delegates[_vault][_from] = to;
 
     _transferDelegateBalance(
       _vault,
@@ -639,7 +642,7 @@ contract TwabController {
       SafeCast.toUint96(userObservations[_vault][_from].details.balance)
     );
 
-    emit Delegated(_vault, _from, _to);
+    emit Delegated(_vault, _from, to);
   }
 
   /**
