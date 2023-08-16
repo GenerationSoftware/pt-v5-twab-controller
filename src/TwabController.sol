@@ -14,8 +14,8 @@ error CannotTransferToSponsorshipAddress();
 /// @notice Emitted when the period length is too short
 error PeriodLengthTooShort();
 
-/// @notice Emitted when the period offset set is not in the past.
-/// @param periodOffset The period offset that was set
+/// @notice Emitted when the period offset is not in the past.
+/// @param periodOffset The period offset that was passed in
 error PeriodOffsetInFuture(uint32 periodOffset);
 
 // The minimum period length
