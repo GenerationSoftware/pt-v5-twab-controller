@@ -146,9 +146,6 @@ library TwabLib {
       );
     }
 
-    uint32 currentTime = uint32(block.timestamp);
-    uint32 index;
-    ObservationLib.Observation memory newestObservation;
     isObservationRecorded = _delegateAmount != uint96(0);
 
     unchecked {
@@ -285,7 +282,7 @@ library TwabLib {
   }
 
   /**
-   * @notice Given an update AccountDetails, either updates the latest Observation or records a new one
+   * @notice Given an AccountDetails with updated balances, either updates the latest Observation or records a new one
    * @param PERIOD_LENGTH The overwrite period length
    * @param PERIOD_OFFSET The overwrite period offset
    * @param _accountDetails The updated account details
