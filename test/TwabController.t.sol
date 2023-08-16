@@ -9,7 +9,8 @@ import {
   SameDelegateAlreadySet,
   CannotTransferToSponsorshipAddress,
   MINIMUM_PERIOD_LENGTH,
-  PeriodLengthTooShort
+  PeriodLengthTooShort,
+  PeriodOffsetInFuture
 } from "../src/TwabController.sol";
 import {
   TwabLib,
@@ -68,11 +69,18 @@ contract TwabControllerTest is BaseTest {
   function setUp() public override {
     super.setUp();
 
-    twabController = new TwabController(PERIOD_LENGTH, PERIOD_OFFSET);
-    token = new ERC20("Test", "TST");
-
     // Ensure time is >= the hardcoded offset.
     vm.warp(PERIOD_OFFSET);
+
+    twabController = new TwabController(PERIOD_LENGTH, PERIOD_OFFSET);
+    token = new ERC20("Test", "TST");
+  }
+
+  function testConstructor_periodOffsetInFuture() public {
+
+    // After current timestamp
+    vm.expectRevert(abi.encodeWithSelector(PeriodOffsetInFuture.selector, block.timestamp + 1));
+    new TwabController(PERIOD_LENGTH, uint32(block.timestamp + 1));
   }
 
   function testConstructor_PeriodLengthTooShort() public {

@@ -14,6 +14,10 @@ error CannotTransferToSponsorshipAddress();
 /// @notice Emitted when the period length is too short
 error PeriodLengthTooShort();
 
+/// @notice Emitted when the period offset set is not in the past.
+/// @param periodOffset The period offset that was set
+error PeriodOffsetInFuture(uint32 periodOffset);
+
 // The minimum period length
 uint32 constant MINIMUM_PERIOD_LENGTH = 1 hours;
 
@@ -145,7 +149,7 @@ contract TwabController {
 
   /**
    * @notice Construct a new TwabController.
-   * @dev Ensure the periods offset is in the past, otherwise underflows will occur whilst calculating periods.
+   * @dev Reverts if the period offset is in the future.
    * @param _periodLength Sets the minimum period length for Observations. When a period elapses, a new Observation
    *      is recorded, otherwise the most recent Observation is updated.
    * @param _periodOffset Sets the beginning timestamp for the first period. This allows us to maximize storage as well
@@ -154,6 +158,9 @@ contract TwabController {
   constructor(uint32 _periodLength, uint32 _periodOffset) {
     if (_periodLength < MINIMUM_PERIOD_LENGTH) {
       revert PeriodLengthTooShort();
+    }
+    if (_periodOffset > block.timestamp) {
+      revert PeriodOffsetInFuture(_periodOffset);
     }
     PERIOD_LENGTH = _periodLength;
     PERIOD_OFFSET = _periodOffset;
