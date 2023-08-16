@@ -657,7 +657,9 @@ contract TwabController {
     ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, _account, _amount, _delegateAmount);
 
     // Always emit the balance change event
-    emit IncreasedBalance(_vault, _user, _amount, _delegateAmount);
+    if (_amount != 0 || _delegateAmount != 0) {
+      emit IncreasedBalance(_vault, _user, _amount, _delegateAmount);
+    }
 
     // Conditionally emit the observation recorded event
     if (_isObservationRecorded) {
@@ -700,7 +702,9 @@ contract TwabController {
       );
 
     // Always emit the balance change event
-    emit DecreasedBalance(_vault, _user, _amount, _delegateAmount);
+    if (_amount != 0 || _delegateAmount != 0) {
+      emit DecreasedBalance(_vault, _user, _amount, _delegateAmount);
+    }
 
     // Conditionally emit the observation recorded event
     if (_isObservationRecorded) {
@@ -742,7 +746,9 @@ contract TwabController {
       );
 
     // Always emit the balance change event
-    emit DecreasedTotalSupply(_vault, _amount, _delegateAmount);
+    if (_amount != 0 || _delegateAmount != 0) {
+      emit DecreasedTotalSupply(_vault, _amount, _delegateAmount);
+    }
 
     // Conditionally emit the observation recorded event
     if (_isObservationRecorded) {
@@ -776,7 +782,9 @@ contract TwabController {
     ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, _account, _amount, _delegateAmount);
 
     // Always emit the balance change event
-    emit IncreasedTotalSupply(_vault, _amount, _delegateAmount);
+    if (_amount != 0 || _delegateAmount != 0) {
+      emit IncreasedTotalSupply(_vault, _amount, _delegateAmount);
+    }
 
     // Conditionally emit the observation recorded event
     if (_isObservationRecorded) {
