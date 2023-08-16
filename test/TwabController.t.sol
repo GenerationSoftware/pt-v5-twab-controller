@@ -681,6 +681,7 @@ contract TwabControllerTest is BaseTest {
     assertEq(twabController.totalSupplyDelegateBalance(address(this)), _amount);
     assertEq(twabController.delegateBalanceOf(address(this), bob), _amount);
     assertEq(twabController.delegateBalanceOf(address(this), alice), 0);
+    vm.stopPrank();
   }
 
   function testDelegateToSponsorship() external {
