@@ -96,9 +96,6 @@ library TwabLib {
     returns (ObservationLib.Observation memory observation, bool isNew, bool isObservationRecorded)
   {
     AccountDetails memory accountDetails = _account.details;
-    uint32 currentTime = uint32(block.timestamp);
-    uint32 index;
-    ObservationLib.Observation memory newestObservation;
     isObservationRecorded = _delegateAmount != uint96(0);
 
     accountDetails.balance += _amount;
@@ -106,40 +103,9 @@ library TwabLib {
 
     // Only record a new Observation if the users delegateBalance has changed.
     if (isObservationRecorded) {
-      (index, newestObservation, isNew) = _getNextObservationIndex(
-        PERIOD_LENGTH,
-        PERIOD_OFFSET,
-        _account.observations,
-        accountDetails
-      );
-
-      if (isNew) {
-        // If the index is new, then we increase the next index to use
-        accountDetails.nextObservationIndex = uint16(
-          RingBufferLib.nextIndex(uint256(index), MAX_CARDINALITY)
-        );
-
-        // Prevent the Account specific cardinality from exceeding the MAX_CARDINALITY.
-        // The ring buffer length is limited by MAX_CARDINALITY. IF the account.cardinality
-        // exceeds the max cardinality, new observations would be incorrectly set or the
-        // observation would be out of "bounds" of the ring buffer. Once reached the
-        // Account.cardinality will continue to be equal to max cardinality.
-        if (accountDetails.cardinality < MAX_CARDINALITY) {
-          accountDetails.cardinality += 1;
-        }
-      }
-
-      observation = ObservationLib.Observation({
-        balance: SafeCast.toUint96(accountDetails.delegateBalance),
-        cumulativeBalance: _extrapolateFromBalance(newestObservation, currentTime),
-        timestamp: currentTime
-      });
-
-      // Write to storage
-      _account.observations[index] = observation;
+      (observation, isNew, accountDetails) = _recordObservation(PERIOD_LENGTH, PERIOD_OFFSET, accountDetails, _account);
     }
 
-    // Write to storage
     _account.details = accountDetails;
   }
 
@@ -180,9 +146,6 @@ library TwabLib {
       );
     }
 
-    uint32 currentTime = uint32(block.timestamp);
-    uint32 index;
-    ObservationLib.Observation memory newestObservation;
     isObservationRecorded = _delegateAmount != uint96(0);
 
     unchecked {
@@ -192,39 +155,9 @@ library TwabLib {
 
     // Only record a new Observation if the users delegateBalance has changed.
     if (isObservationRecorded) {
-      (index, newestObservation, isNew) = _getNextObservationIndex(
-        PERIOD_LENGTH,
-        PERIOD_OFFSET,
-        _account.observations,
-        accountDetails
-      );
-
-      if (isNew) {
-        // If the index is new, then we increase the next index to use
-        accountDetails.nextObservationIndex = uint16(
-          RingBufferLib.nextIndex(uint256(index), MAX_CARDINALITY)
-        );
-
-        // Prevent the Account specific cardinality from exceeding the MAX_CARDINALITY.
-        // The ring buffer length is limited by MAX_CARDINALITY. IF the account.cardinality
-        // exceeds the max cardinality, new observations would be incorrectly set or the
-        // observation would be out of "bounds" of the ring buffer. Once reached the
-        // Account.cardinality will continue to be equal to max cardinality.
-        if (accountDetails.cardinality < MAX_CARDINALITY) {
-          accountDetails.cardinality += 1;
-        }
-      }
-
-      observation = ObservationLib.Observation({
-        balance: SafeCast.toUint96(accountDetails.delegateBalance),
-        cumulativeBalance: _extrapolateFromBalance(newestObservation, currentTime),
-        timestamp: currentTime
-      });
-
-      // Write to storage
-      _account.observations[index] = observation;
+      (observation, isNew, accountDetails) = _recordObservation(PERIOD_LENGTH, PERIOD_OFFSET, accountDetails, _account);
     }
-    // Write to storage
+
     _account.details = accountDetails;
   }
 
@@ -346,6 +279,58 @@ library TwabLib {
     return
       (endObservation.cumulativeBalance - startObservation.cumulativeBalance) /
       (_endTime - _startTime);
+  }
+
+  /**
+   * @notice Given an AccountDetails with updated balances, either updates the latest Observation or records a new one
+   * @param PERIOD_LENGTH The overwrite period length
+   * @param PERIOD_OFFSET The overwrite period offset
+   * @param _accountDetails The updated account details
+   * @param _account The account to update
+   * @return observation The new/updated observation
+   * @return isNew Whether or not the observation is new or overwrote a previous one
+   * @return newAccountDetails The new account details
+   */
+  function _recordObservation(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    AccountDetails memory _accountDetails,
+    Account storage _account
+  ) internal returns (ObservationLib.Observation memory observation, bool isNew, AccountDetails memory newAccountDetails) {
+    uint32 currentTime = uint32(block.timestamp);
+    
+    uint16 nextIndex;
+    ObservationLib.Observation memory newestObservation;
+    (nextIndex, newestObservation, isNew) = _getNextObservationIndex(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      _account.observations,
+      _accountDetails
+    );
+
+    if (isNew) {
+      // If the index is new, then we increase the next index to use
+      _accountDetails.nextObservationIndex = uint16(
+        RingBufferLib.nextIndex(uint256(nextIndex), MAX_CARDINALITY)
+      );
+
+      // Prevent the Account specific cardinality from exceeding the MAX_CARDINALITY.
+      // The ring buffer length is limited by MAX_CARDINALITY. IF the account.cardinality
+      // exceeds the max cardinality, new observations would be incorrectly set or the
+      // observation would be out of "bounds" of the ring buffer. Once reached the
+      // Account.cardinality will continue to be equal to max cardinality.
+      _accountDetails.cardinality = _accountDetails.cardinality < MAX_CARDINALITY ? _accountDetails.cardinality + 1 : MAX_CARDINALITY;
+    }
+
+    observation = ObservationLib.Observation({
+      balance: SafeCast.toUint96(_accountDetails.delegateBalance),
+      cumulativeBalance: _extrapolateFromBalance(newestObservation, currentTime),
+      timestamp: currentTime
+    });
+
+    // Write to storage
+    _account.observations[nextIndex] = observation;
+    newAccountDetails = _accountDetails;
   }
 
   /**
