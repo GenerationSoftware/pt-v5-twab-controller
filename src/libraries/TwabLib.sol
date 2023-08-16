@@ -30,6 +30,11 @@ error TimestampNotFinalized(uint256 timestamp, uint256 currentOverwritePeriodSta
 /// @param end The end time
 error InvalidTimeRange(uint256 start, uint256 end);
 
+/// @notice Emitted when there is insufficient history to lookup a twab time range
+/// @param requestedTimestamp The timestamp requested
+/// @param oldestTimestamp The oldest timestamp that can be read
+error InsufficientHistory(uint32 requestedTimestamp, uint32 oldestTimestamp);
+
 /**
  * @title  PoolTogether V5 TwabLib (Library)
  * @author PoolTogether Inc Team
@@ -70,7 +75,7 @@ library TwabLib {
    */
   struct Account {
     AccountDetails details;
-    ObservationLib.Observation[365] observations;
+    ObservationLib.Observation[9600] observations;
   }
 
   /**
@@ -548,7 +553,6 @@ library TwabLib {
     uint32 currentTime = uint32(block.timestamp);
 
     uint16 oldestTwabIndex;
-    uint16 newestTwabIndex;
 
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
@@ -556,30 +560,38 @@ library TwabLib {
         ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
     }
 
-    // Find the newest observation and check if the target time is AFTER it
-    (newestTwabIndex, prevOrAtObservation) = getNewestObservation(_observations, _accountDetails);
-    if (_targetTime >= prevOrAtObservation.timestamp) {
+    (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
+    
+    // if the requested time is older than the oldest observation
+    if (_targetTime < prevOrAtObservation.timestamp) { 
+      // if the user didn't have any activity prior to the oldest observation, then we know they had a zero balance
+      if (_accountDetails.cardinality < MAX_CARDINALITY) {
+        return ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: _targetTime });
+      } else {
+        // if we are missing their history, we must revert
+        revert InsufficientHistory(_targetTime, prevOrAtObservation.timestamp);
+      }
+    }
+
+    // We know targetTime >= oldestObservation.timestamp because of the above if statement, so we can return here.
+    if (_accountDetails.cardinality == 1) {
       return prevOrAtObservation;
     }
 
-    // If there is only 1 observation and it's after the target, then return zero
-    if (_accountDetails.cardinality == 1) {
-      return
-        ObservationLib.Observation({
-          cumulativeBalance: 0,
-          balance: 0,
-          timestamp: PERIOD_OFFSET
-        });
-    }
-
-    // Find the oldest Observation and check if the target time is BEFORE it
-    (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
-    if (_targetTime < prevOrAtObservation.timestamp) {
-      return
-        ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
-    }
-
+    uint16 newestTwabIndex;
     ObservationLib.Observation memory afterOrAtObservation;
+
+    // Find the newest observation
+    (newestTwabIndex, afterOrAtObservation) = getNewestObservation(_observations, _accountDetails);
+    // if the target time is at or after the newest, return it
+    if (_targetTime >= afterOrAtObservation.timestamp) {
+      return afterOrAtObservation;
+    }
+    // if we know there is only 1 observation older than the newest
+    if (_accountDetails.cardinality == 2) {
+      return prevOrAtObservation;
+    }
+
     // Otherwise, we perform a binarySearch to find the observation before or at the timestamp
     (prevOrAtObservation, afterOrAtObservation) = ObservationLib.binarySearch(
       _observations,

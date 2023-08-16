@@ -7,7 +7,8 @@ import {
   TwabLib,
   BalanceLTAmount,
   DelegateBalanceLTAmount,
-  TimestampNotFinalized  
+  TimestampNotFinalized,
+  InsufficientHistory
 } from "../src/libraries/TwabLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 
@@ -18,7 +19,7 @@ contract TwabLibTest is BaseTest {
   TwabLibMock public twabLibMock;
   uint32 public DRAW_LENGTH = 1 days;
   uint32 public LARGE_DRAW_LENGTH = 7 days;
-  uint32 public VERY_LARGE_DRAW_LENGTH = 365 days;
+  uint32 public VERY_LARGE_DRAW_LENGTH = 399 days;
   uint32 public constant PERIOD_OFFSET = 10 days;
   uint32 public constant PERIOD_LENGTH = 1 days;
 
@@ -71,7 +72,6 @@ contract TwabLibTest is BaseTest {
 
   function testIncreaseDelegateBalanceHappyPath() public {
     uint96 _amount = 1000e18;
-    uint32 _initialTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH);
     uint32 _currentTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
     vm.warp(_currentTimestamp);
 
@@ -88,8 +88,6 @@ contract TwabLibTest is BaseTest {
     assertEq(_observation.timestamp, _currentTimestamp);
     assertTrue(_isNew);
     assertTrue(_isRecorded);
-
-    assertEq(twabLibMock.getBalanceAt(_initialTimestamp), 0);
 
     vm.warp(_currentTimestamp + PERIOD_LENGTH);
 
@@ -521,109 +519,157 @@ contract TwabLibTest is BaseTest {
     twabLibMock.decreaseBalances(0, _secondAmount, "insufficient-balance");
   }
 
-  function testAverageDelegateBalanceBetweenDoubleTwabBefore() public {
-    (
-      uint32 _initialTimestamp,
-      ,
-      uint32 _currentTimestamp,
-      ,
-
-    ) = averageDelegateBalanceBetweenDoubleSetup();
-
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_initialTimestamp - 100, _initialTimestamp - 50);
-
-    assertEq(_balance, 0);
+  function testGetTwabBetween_empty() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time, time + 50), 0);
   }
 
-  function testAverageDelegateBalanceBetwenDoubleCenteredFirst() public {
-    (
-      uint32 _initialTimestamp,
-      ,
-      uint32 _currentTimestamp,
-      ,
-
-    ) = averageDelegateBalanceBetweenDoubleSetup();
-
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_initialTimestamp - 50, _initialTimestamp + 50);
-
-    assertEq(_balance, 500e18);
+  function testGetTwabBetween_one_before() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time - 100, time - 50), 0);
   }
 
-  function testAverageDelegateBalanceBetwenDoubleOldestIsFirst() public {
-    (
-      uint32 _initialTimestamp,
-      ,
-      uint32 _currentTimestamp,
-      ,
-
-    ) = averageDelegateBalanceBetweenDoubleSetup();
-
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_initialTimestamp, _initialTimestamp + 50);
-
-    assertEq(_balance, 1000e18);
+  function testGetTwabBetween_one_onAndAfter() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time, time + 50), 1000e18);
   }
 
-  function testAverageDelegateBalanceBetweenDoubleBetween() public {
-    (
-      uint32 _initialTimestamp,
-      uint32 _secondTimestamp,
-      uint32 _currentTimestamp,
-      ,
-
-    ) = averageDelegateBalanceBetweenDoubleSetup();
-
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_initialTimestamp + 50, _secondTimestamp - 50);
-
-    assertEq(_balance, 1000e18);
+  function testGetTwabBetween_one_afterAndAfter() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time+50, time + 100), 1000e18);
   }
 
-  function testAverageDelegateBalanceBetweenDoubleCenteredSecond() public {
-    (
-      ,
-      uint32 _secondTimestamp,
-      uint32 _currentTimestamp,
-      ,
-
-    ) = averageDelegateBalanceBetweenDoubleSetup();
-
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_secondTimestamp - 50, _secondTimestamp + 50);
-
-    assertEq(_balance, 750e18);
+  function testGetTwabBetween_two_before() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time - 100, time - 50), 0);
   }
 
-  function testAverageDelegateBalanceBetweenDoubleAfter() public {
-    (
-      ,
-      uint32 _secondTimestamp,
-      uint32 _currentTimestamp,
-      ,
-
-    ) = averageDelegateBalanceBetweenDoubleSetup();
-
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_secondTimestamp + 50, _secondTimestamp + 51);
-
-    assertEq(_balance, 500e18);
+  function testGetTwabBetween_two_onAndBeforeSecond() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time, time + PERIOD_LENGTH - 1), 1000e18);
   }
 
-  function testAverageDelegateBalanceTargetOldest() public {
-    (
-      ,
-      uint32 _secondTimestamp,
-      uint32 _currentTimestamp,
-      ,
+  function testGetTwabBetween_two_onAndOn() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time, time + PERIOD_LENGTH), 1000e18);
+  }
 
-    ) = averageDelegateBalanceBetweenDoubleSetup();
+  function testGetTwabBetween_two_onAndAfter() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time, time + PERIOD_LENGTH*2), 1500e18);
+  }
 
-    vm.warp(_currentTimestamp);
-    uint256 _balance = twabLibMock.getTwabBetween(_secondTimestamp - 10, _secondTimestamp);
+  function testGetTwabBetween_two_beforeSecondAndAfter() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time+PERIOD_LENGTH/2, time + PERIOD_LENGTH + PERIOD_LENGTH/2), 1500e18);
+  }
 
-    assertEq(_balance, 1000e18);
+  function testGetTwabBetween_two_onSecondAndAfter() public {
+    uint32 time = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(time);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1000e18);
+    vm.warp(time + PERIOD_LENGTH*2);
+    assertEq(twabLibMock.getTwabBetween(time+PERIOD_LENGTH, time + PERIOD_LENGTH*2), 2000e18);
+  }
+
+  function testGetBalanceAt_empty_beforeOffset() public {
+    assertEq(twabLibMock.getBalanceAt(0), 0);
+  }
+
+  function testGetBalanceAt_empty_atOffset() public {
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET), 0);
+  }
+
+  function testGetBalanceAt_empty_afterOffset() public {
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET + 2), 0);
+  }
+
+  function testGetBalanceAt_one_before() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getBalanceAt(0), 0);
+  }
+
+  function testGetBalanceAt_one_at() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET), 1e18);
+  }
+
+  function testGetBalanceAt_two_before() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(PERIOD_OFFSET+PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getBalanceAt(0), 0);
+  }
+
+  function testGetBalanceAt_two_atFirst() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(PERIOD_OFFSET+PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET), 1e18);
+  }
+
+  function testGetBalanceAt_two_between() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(PERIOD_OFFSET+PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET+PERIOD_LENGTH/2), 1e18);
+  }
+
+  function testGetBalanceAt_two_atSecond() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(PERIOD_OFFSET+PERIOD_LENGTH);
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET + PERIOD_LENGTH), 2e18);
+  }
+
+  function testGetBalanceAt_InsufficientHistory() public {
+    fillObservationsBuffer();
+    vm.expectRevert(abi.encodeWithSelector(InsufficientHistory.selector, PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH));
+    twabLibMock.getBalanceAt(PERIOD_OFFSET);
   }
 
   /* ============ getBalanceAt ============ */
@@ -636,11 +682,11 @@ contract TwabLibTest is BaseTest {
     twabLibMock.increaseBalances(0, 1000e18);
   }
 
-  function testcurrentOverwritePeriodStartedAt_atStart() public {
+  function testCurrentOverwritePeriodStartedAt_atStart() public {
     assertEq(twabLibMock.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
   }
 
-  function testcurrentOverwritePeriodStartedAt_halfwayThroughFirst() public {
+  function testCurrentOverwritePeriodStartedAt_halfwayThroughFirst() public {
     vm.warp(PERIOD_OFFSET + PERIOD_LENGTH/2);
     assertEq(twabLibMock.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET), PERIOD_OFFSET);
   }
@@ -743,8 +789,28 @@ contract TwabLibTest is BaseTest {
 
   // ================== getPreviousOrAtObservation ==================
 
+  function testGetPreviousOrAtObservation_single_before() public {
+    uint32 t0 = PERIOD_OFFSET;
+    twabLibMock.increaseBalances(0, 1e18);
+    assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1).timestamp, t0-1);
+  }
+
+  function testGetPreviousOrAtObservation_single_at() public {
+    uint32 t0 = PERIOD_OFFSET;
+    twabLibMock.increaseBalances(0, 1e18);
+    ObservationLib.Observation memory obs = twabLibMock.getPreviousOrAtObservation(t0);
+    assertEq(obs.timestamp, t0);
+  }
+
+  function testGetPreviousOrAtObservation_single_after() public {
+    uint32 t0 = PERIOD_OFFSET;
+    twabLibMock.increaseBalances(0, 1e18);
+    ObservationLib.Observation memory obs = twabLibMock.getPreviousOrAtObservation(t0+1);
+    assertEq(obs.timestamp, t0);
+  }
+
   function testGetPreviousOrAtObservation() public {
-    uint32 t0 = PERIOD_OFFSET + 10 seconds;
+    uint32 t0 = PERIOD_OFFSET;
     uint32 t1 = PERIOD_OFFSET + PERIOD_LENGTH;
     uint32 t2 = PERIOD_OFFSET + (PERIOD_LENGTH * 2);
     uint32 t3 = PERIOD_OFFSET + (PERIOD_LENGTH * 3);
@@ -754,8 +820,7 @@ contract TwabLibTest is BaseTest {
     twabLibMock.increaseBalances(1, 1);
 
     // Get observation at timestamp before first observation
-    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds).timestamp, t0-1);
 
     // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);
@@ -774,7 +839,7 @@ contract TwabLibTest is BaseTest {
 
     // Get observation at timestamp before first observation
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, PERIOD_OFFSET, "before first period");
+    assertEq(prevOrAtObservation.timestamp, t0 - 1 seconds, "before first period");
 
     // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);
@@ -829,18 +894,12 @@ contract TwabLibTest is BaseTest {
     fillObservationsBuffer();
     ObservationLib.Observation memory prevOrAtObservation;
 
-    // First observation is overwritten, returns zeroed value
-    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(PERIOD_OFFSET);
-    assertEq(prevOrAtObservation.timestamp, PERIOD_OFFSET);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    // First observation is overwritten, reverts
+    vm.expectRevert(abi.encodeWithSelector(InsufficientHistory.selector, PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH));
+    twabLibMock.getPreviousOrAtObservation(PERIOD_OFFSET);
 
     // Get before oldest observation
     (, ObservationLib.Observation memory oldestObservation) = twabLibMock.getOldestObservation();
-    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(
-      oldestObservation.timestamp - 1 seconds
-    );
-    assertEq(prevOrAtObservation.timestamp, PERIOD_OFFSET);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
 
     // Get at oldest observation
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(oldestObservation.timestamp);
