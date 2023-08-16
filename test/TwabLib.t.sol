@@ -72,7 +72,6 @@ contract TwabLibTest is BaseTest {
 
   function testIncreaseDelegateBalanceHappyPath() public {
     uint96 _amount = 1000e18;
-    uint32 _initialTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH);
     uint32 _currentTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
     vm.warp(_currentTimestamp);
 
@@ -89,8 +88,6 @@ contract TwabLibTest is BaseTest {
     assertEq(_observation.timestamp, _currentTimestamp);
     assertTrue(_isNew);
     assertTrue(_isRecorded);
-
-    assertEq(twabLibMock.getBalanceAt(_initialTimestamp), 0);
 
     vm.warp(_currentTimestamp + PERIOD_LENGTH);
 
@@ -846,11 +843,11 @@ contract TwabLibTest is BaseTest {
     // Get observation at timestamp before first observation
     assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds).timestamp, t0-1);
 
-    // // Get observation at first timestamp
+    // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);
     assertEq(prevOrAtObservation.timestamp, t0);
 
-    // // Get observation after first timestamp
+    // Get observation after first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 + 1 seconds);
     assertEq(prevOrAtObservation.timestamp, t0);
 

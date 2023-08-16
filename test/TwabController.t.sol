@@ -7,13 +7,16 @@ import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import {
   TwabController,
   SameDelegateAlreadySet,
-  CannotTransferToSponsorshipAddress
+  CannotTransferToSponsorshipAddress,
+  MINIMUM_PERIOD_LENGTH,
+  PeriodLengthTooShort
 } from "../src/TwabController.sol";
 import {
   TwabLib,
   TimestampNotFinalized,
   InvalidTimeRange
 } from "../src/libraries/TwabLib.sol";
+import { TwabLib } from "../src/libraries/TwabLib.sol";
 import { ObservationLib } from "../src/libraries/ObservationLib.sol";
 import { BaseTest } from "./utils/BaseTest.sol";
 
@@ -72,8 +75,9 @@ contract TwabControllerTest is BaseTest {
     vm.warp(PERIOD_OFFSET);
   }
 
-  function testConstructor() public {
-
+  function testConstructor_PeriodLengthTooShort() public {
+    vm.expectRevert(abi.encodeWithSelector(PeriodLengthTooShort.selector));
+    new TwabController(MINIMUM_PERIOD_LENGTH-1, PERIOD_OFFSET);
   }
 
   function testGetAccount() external {

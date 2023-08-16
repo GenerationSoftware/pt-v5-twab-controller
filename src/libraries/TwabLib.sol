@@ -30,6 +30,9 @@ error TimestampNotFinalized(uint256 timestamp, uint256 currentOverwritePeriodSta
 /// @param end The end time
 error InvalidTimeRange(uint256 start, uint256 end);
 
+/// @notice Emitted when there is insufficient history to lookup a twab time range
+/// @param requestedTimestamp The timestamp requested
+/// @param oldestTimestamp The oldest timestamp that can be read
 error InsufficientHistory(uint32 requestedTimestamp, uint32 oldestTimestamp);
 
 /**
@@ -570,7 +573,7 @@ library TwabLib {
       }
     }
 
-    // We know targetTime >= oldestObservation.timestamp, so we can return here.
+    // We know targetTime >= oldestObservation.timestamp because of the above if statement, so we can return here.
     if (_accountDetails.cardinality == 1) {
       return prevOrAtObservation;
     }
@@ -578,9 +581,9 @@ library TwabLib {
     uint16 newestTwabIndex;
     ObservationLib.Observation memory afterOrAtObservation;
 
-    // Find the newest observation and check if the target time is AFTER it
+    // Find the newest observation
     (newestTwabIndex, afterOrAtObservation) = getNewestObservation(_observations, _accountDetails);
-    // if the target time is after the newest
+    // if the target time is at or after the newest, return it
     if (_targetTime >= afterOrAtObservation.timestamp) {
       return afterOrAtObservation;
     }
