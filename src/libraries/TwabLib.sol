@@ -206,8 +206,7 @@ library TwabLib {
 
   /**
    * @notice Looks up a users balance at a specific time in the past. The time must be before the current overwrite period.
-   * @dev If the time is not an exact match of an observation, the balance is extrapolated using the previous observation.
-   * @dev Ensure timestamps are safe using hasFinalized
+   * @dev Ensure timestamps are safe using requireFinalized
    * @param PERIOD_LENGTH The length of an overwrite period
    * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
@@ -365,7 +364,7 @@ library TwabLib {
    * @param PERIOD_OFFSET The offset of the first period
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
-   * @return index The index of the next observation
+   * @return index The index of the next observation slot to overwrite
    * @return newestObservation The newest observation in the circular buffer
    * @return isNew Whether or not the observation is new
    */
