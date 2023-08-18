@@ -15,6 +15,7 @@ import {
 import {
   TwabLib,
   TimestampNotFinalized,
+  MAX_CARDINALITY,
   InvalidTimeRange
 } from "../src/libraries/TwabLib.sol";
 import { TwabLib } from "../src/libraries/TwabLib.sol";
@@ -25,7 +26,6 @@ contract TwabControllerTest is BaseTest {
   TwabController public twabController;
   address public mockVault = address(0x1234);
   ERC20 public token;
-  uint16 public constant MAX_CARDINALITY = 9600;
   uint32 public constant PERIOD_LENGTH = 1 days;
   uint32 public constant PERIOD_OFFSET = 10 days;
 
@@ -1085,5 +1085,48 @@ contract TwabControllerTest is BaseTest {
   function testHasFinalized() external {
     vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
     assertTrue(twabController.hasFinalized(PERIOD_OFFSET));
+  }
+
+  function testGasUsage_OneObservation() public {
+    uint gasBefore;
+    uint gasAfter;
+
+    vm.warp(PERIOD_OFFSET+100*PERIOD_LENGTH);
+    twabController.mint(alice, 1e18);
+    vm.warp(PERIOD_OFFSET+MAX_CARDINALITY*PERIOD_LENGTH);
+
+    uint endTime = PERIOD_OFFSET + (MAX_CARDINALITY * PERIOD_LENGTH);
+
+    gasBefore = gasleft();
+    twabController.getTwabBetween(address(this), alice, uint32(PERIOD_OFFSET), uint32(endTime));
+    gasAfter = gasleft();
+
+    console2.log("Gas used: ", gasBefore - gasAfter);
+  }
+
+  function testGasUsage_FullObservations() public {
+    uint gasBefore;
+    uint gasAfter;
+
+    fillObservationsBuffer(address(this), alice);
+    uint startTime = PERIOD_OFFSET + PERIOD_LENGTH*100;
+    uint endTime = PERIOD_OFFSET + (MAX_CARDINALITY * PERIOD_LENGTH);
+
+    gasBefore = gasleft();
+    twabController.getTwabBetween(address(this), alice, uint32(startTime), uint32(endTime));
+    gasAfter = gasleft();
+
+    console2.log("Gas used: ", gasBefore - gasAfter);
+  }
+
+  function fillObservationsBuffer(address vault, address user) internal {
+    vm.startPrank(vault);
+    uint32 t = PERIOD_OFFSET;
+    for (uint256 i = 0; i <= MAX_CARDINALITY; i++) {
+      vm.warp(t);
+      twabController.mint(user, 1e18);
+      t += PERIOD_LENGTH;
+    }
+    vm.stopPrank();
   }
 }
