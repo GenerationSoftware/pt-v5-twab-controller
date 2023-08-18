@@ -15,25 +15,27 @@ contract TwabLibMock {
   function increaseBalances(
     uint96 _amount,
     uint96 _delegateAmount
-  ) external returns (ObservationLib.Observation memory, bool, bool) {
+  ) external returns (ObservationLib.Observation memory, bool, bool, TwabLib.AccountDetails memory) {
     (
       ObservationLib.Observation memory observation,
       bool isNewObservation,
-      bool isObservationRecorded
+      bool isObservationRecorded,
+      TwabLib.AccountDetails memory accountDetails
     ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, account, _amount, _delegateAmount);
 
-    return (observation, isNewObservation, isObservationRecorded);
+    return (observation, isNewObservation, isObservationRecorded, accountDetails);
   }
 
   function decreaseBalances(
     uint96 _amount,
     uint96 _delegateAmount,
     string memory _revertMessage
-  ) external returns (ObservationLib.Observation memory, bool, bool) {
+  ) external returns (ObservationLib.Observation memory, bool, bool, TwabLib.AccountDetails memory) {
     (
       ObservationLib.Observation memory observation,
       bool isNewObservation,
-      bool isObservationRecorded
+      bool isObservationRecorded,
+      TwabLib.AccountDetails memory accountDetails
     ) = TwabLib.decreaseBalances(
         PERIOD_LENGTH,
         PERIOD_OFFSET,
@@ -43,7 +45,7 @@ contract TwabLibMock {
         _revertMessage
       );
 
-    return (observation, isNewObservation, isObservationRecorded);
+    return (observation, isNewObservation, isObservationRecorded, accountDetails);
   }
 
   function getTwabBetween(uint32 _startTime, uint32 _endTime) external view returns (uint256) {
@@ -133,10 +135,10 @@ contract TwabLibMock {
   }
 
   function currentOverwritePeriodStartedAt(
-    uint32 PERIOD_LENGTH,
-    uint32 PERIOD_OFFSET
+    uint32 _PERIOD_LENGTH,
+    uint32 _PERIOD_OFFSET
   ) external view returns (uint32) {
-    uint32 start = TwabLib.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
+    uint32 start = TwabLib.currentOverwritePeriodStartedAt(_PERIOD_LENGTH, _PERIOD_OFFSET);
     return start;
   }
 

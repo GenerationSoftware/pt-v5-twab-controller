@@ -21,6 +21,8 @@ error PeriodOffsetInFuture(uint32 periodOffset);
 // The minimum period length
 uint32 constant MINIMUM_PERIOD_LENGTH = 1 hours;
 
+address constant SPONSORSHIP_ADDRESS = address(1);
+
 /**
  * @title  Time-Weighted Average Balance Controller
  * @author PoolTogether Inc.
@@ -37,7 +39,6 @@ contract TwabController {
   using SafeCast for uint256;
 
   /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
-  address public constant SPONSORSHIP_ADDRESS = address(1);
   
   /// @notice Sets the minimum period length for Observations. When a period elapses, a new Observation is recorded, otherwise the most recent Observation is updated.
   uint32 public immutable PERIOD_LENGTH;
@@ -679,7 +680,8 @@ contract TwabController {
     (
       ObservationLib.Observation memory _observation,
       bool _isNewObservation,
-      bool _isObservationRecorded
+      bool _isObservationRecorded,
+      TwabLib.AccountDetails memory accountDetails
     ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, _account, _amount, _delegateAmount);
 
     // Always emit the balance change event
@@ -692,8 +694,8 @@ contract TwabController {
       emit ObservationRecorded(
         _vault,
         _user,
-        _account.details.balance,
-        _account.details.delegateBalance,
+        accountDetails.balance,
+        accountDetails.delegateBalance,
         _isNewObservation,
         _observation
       );
@@ -717,7 +719,8 @@ contract TwabController {
     (
       ObservationLib.Observation memory _observation,
       bool _isNewObservation,
-      bool _isObservationRecorded
+      bool _isObservationRecorded,
+      TwabLib.AccountDetails memory accountDetails
     ) = TwabLib.decreaseBalances(
         PERIOD_LENGTH,
         PERIOD_OFFSET,
@@ -737,8 +740,8 @@ contract TwabController {
       emit ObservationRecorded(
         _vault,
         _user,
-        _account.details.balance,
-        _account.details.delegateBalance,
+        accountDetails.balance,
+        accountDetails.delegateBalance,
         _isNewObservation,
         _observation
       );
@@ -761,7 +764,8 @@ contract TwabController {
     (
       ObservationLib.Observation memory _observation,
       bool _isNewObservation,
-      bool _isObservationRecorded
+      bool _isObservationRecorded,
+      TwabLib.AccountDetails memory accountDetails
     ) = TwabLib.decreaseBalances(
         PERIOD_LENGTH,
         PERIOD_OFFSET,
@@ -780,8 +784,8 @@ contract TwabController {
     if (_isObservationRecorded) {
       emit TotalSupplyObservationRecorded(
         _vault,
-        _account.details.balance,
-        _account.details.delegateBalance,
+        accountDetails.balance,
+        accountDetails.delegateBalance,
         _isNewObservation,
         _observation
       );
@@ -804,7 +808,8 @@ contract TwabController {
     (
       ObservationLib.Observation memory _observation,
       bool _isNewObservation,
-      bool _isObservationRecorded
+      bool _isObservationRecorded,
+      TwabLib.AccountDetails memory accountDetails
     ) = TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, _account, _amount, _delegateAmount);
 
     // Always emit the balance change event
@@ -816,8 +821,8 @@ contract TwabController {
     if (_isObservationRecorded) {
       emit TotalSupplyObservationRecorded(
         _vault,
-        _account.details.balance,
-        _account.details.delegateBalance,
+        accountDetails.balance,
+        accountDetails.delegateBalance,
         _isNewObservation,
         _observation
       );
