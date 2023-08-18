@@ -48,10 +48,8 @@ contract TwabLibTest is BaseTest {
     uint32 _currentTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
     vm.warp(_currentTimestamp);
 
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(_amount, 0);
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, _amount);
     assertEq(accountDetails.delegateBalance, 0);
@@ -75,10 +73,8 @@ contract TwabLibTest is BaseTest {
     uint32 _currentTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
     vm.warp(_currentTimestamp);
 
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(0, _amount);
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _amount);
@@ -104,10 +100,8 @@ contract TwabLibTest is BaseTest {
     // Increase delegateBalance twice
     twabLibMock.increaseBalances(0, _amount);
 
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(0, _amount);
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _totalAmount);
@@ -130,10 +124,8 @@ contract TwabLibTest is BaseTest {
     uint32 _secondTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
 
     vm.warp(_initialTimestamp);
-    (ObservationLib.Observation memory _observation1, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation1, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(0, _amount);
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _amount);
@@ -149,9 +141,7 @@ contract TwabLibTest is BaseTest {
     vm.warp(_secondTimestamp);
 
     ObservationLib.Observation memory _observation2;
-    (_observation2, _isNew, _isRecorded) = twabLibMock.increaseBalances(0, _amount);
-
-    accountDetails = twabLibMock.getAccountDetails();
+    (_observation2, _isNew, _isRecorded, accountDetails) = twabLibMock.increaseBalances(0, _amount);
 
     // Check balance
     assertEq(accountDetails.balance, 0);
@@ -178,16 +168,16 @@ contract TwabLibTest is BaseTest {
   function testDecreaseBalanceHappyPath() public {
     uint96 _amount = 1000e18;
 
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded,) = twabLibMock
       .increaseBalances(_amount, 0);
+    
+    TwabLib.AccountDetails memory accountDetails;
 
-    (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
+    (_observation, _isNew, _isRecorded, accountDetails) = twabLibMock.decreaseBalances(
       _amount,
       0,
       "Revert message"
     );
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, 0);
@@ -202,12 +192,8 @@ contract TwabLibTest is BaseTest {
     uint32 _secondTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
 
     vm.warp(_initialTimestamp);
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(0, _amount);
-
-    TwabLib.AccountDetails memory accountDetails;
-    
-    // accountDetails = twabLibMock.getAccountDetails();
 
     // assertEq(accountDetails.balance, 0);
     // assertEq(accountDetails.delegateBalance, _amount);
@@ -218,13 +204,11 @@ contract TwabLibTest is BaseTest {
     // assertTrue(_isNew);
 
     vm.warp(_secondTimestamp);
-    (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
+    (_observation, _isNew, _isRecorded, accountDetails) = twabLibMock.decreaseBalances(
       0,
       _amount,
       "Revert message"
     );
-
-    accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0, "balance is zero");
     assertEq(accountDetails.delegateBalance, 0, "delegate balance is zero");
@@ -248,10 +232,8 @@ contract TwabLibTest is BaseTest {
     uint32 _secondTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
 
     vm.warp(_initialTimestamp);
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(0, _amount);
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _amount);
@@ -267,7 +249,7 @@ contract TwabLibTest is BaseTest {
     vm.expectRevert(
       abi.encodeWithSelector(BalanceLTAmount.selector, 0, _amount + 1, "Revert message")
     );
-    (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
+    (_observation, _isNew, _isRecorded, accountDetails) = twabLibMock.decreaseBalances(
       _amount + 1,
       0,
       "Revert message"
@@ -282,7 +264,7 @@ contract TwabLibTest is BaseTest {
         "Revert message"
       )
     );
-    (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
+    (_observation, _isNew, _isRecorded, accountDetails) = twabLibMock.decreaseBalances(
       0,
       _amount + 1,
       "Revert message"
@@ -298,10 +280,8 @@ contract TwabLibTest is BaseTest {
     uint32 _thirdTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 3);
 
     vm.warp(_initialTimestamp);
-    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded) = twabLibMock
+    (ObservationLib.Observation memory _observation, bool _isNew, bool _isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock
       .increaseBalances(0, _amount);
-
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _amount);
@@ -313,13 +293,11 @@ contract TwabLibTest is BaseTest {
 
     vm.warp(_secondTimestamp);
     ObservationLib.Observation memory _observation2;
-    (_observation2, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
+    (_observation2, _isNew, _isRecorded, accountDetails) = twabLibMock.decreaseBalances(
       0,
       _halfAmount,
       "Revert message"
     );
-
-    accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _halfAmount);
@@ -330,13 +308,11 @@ contract TwabLibTest is BaseTest {
     assertTrue(_isNew);
 
     vm.warp(_thirdTimestamp);
-    (_observation, _isNew, _isRecorded) = twabLibMock.decreaseBalances(
+    (_observation, _isNew, _isRecorded, accountDetails) = twabLibMock.decreaseBalances(
       0,
       _halfAmount,
       "Revert message"
     );
-
-    accountDetails = twabLibMock.getAccountDetails();
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, 0);
@@ -746,10 +722,10 @@ contract TwabLibTest is BaseTest {
     TwabLib.Account memory account = twabLibMock.getAccount();
     assertEq(account.details.cardinality, 0);
 
-    vm.warp(PERIOD_OFFSET + 1 seconds);
-    (, bool isNew, bool isRecorded) = twabLibMock.increaseBalances(0, _amount);
+    
 
-    TwabLib.AccountDetails memory accountDetails = twabLibMock.getAccountDetails();
+    vm.warp(PERIOD_OFFSET + 1 seconds);
+    (, bool isNew, bool isRecorded, TwabLib.AccountDetails memory accountDetails) = twabLibMock.increaseBalances(0, _amount);
 
     // First observation creates new record
     assertTrue(isNew);
@@ -761,8 +737,7 @@ contract TwabLibTest is BaseTest {
 
     // Second observation overwrites previous record
     vm.warp(PERIOD_OFFSET + (DRAW_LENGTH / 2));
-    (, isNew, isRecorded) = twabLibMock.increaseBalances(0, _amount);
-    accountDetails = twabLibMock.getAccountDetails();
+    (, isNew, isRecorded, accountDetails) = twabLibMock.increaseBalances(0, _amount);
     assertFalse(isNew);
     assertTrue(isRecorded);
     assertEq(accountDetails.nextObservationIndex, 1);

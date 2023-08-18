@@ -10,6 +10,7 @@ import {
   CannotTransferToSponsorshipAddress,
   MINIMUM_PERIOD_LENGTH,
   PeriodLengthTooShort,
+  SPONSORSHIP_ADDRESS,
   PeriodOffsetInFuture
 } from "../src/TwabController.sol";
 import {
@@ -402,7 +403,7 @@ contract TwabControllerTest is BaseTest {
     assertEq(twabController.balanceOf(mockVault, alice), _amount);
     assertEq(twabController.delegateBalanceOf(mockVault, alice), 0);
 
-    address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
+    address _sponsorshipAddress = SPONSORSHIP_ADDRESS;
     assertEq(twabController.balanceOf(mockVault, _sponsorshipAddress), 0);
     assertEq(twabController.delegateBalanceOf(mockVault, _sponsorshipAddress), 0);
 
@@ -438,7 +439,7 @@ contract TwabControllerTest is BaseTest {
     assertEq(twabController.balanceOf(mockVault, bob), _amount);
     assertEq(twabController.delegateBalanceOf(mockVault, alice), _amount);
     assertEq(twabController.delegateBalanceOf(mockVault, bob), _amount);
-    assertEq(twabController.delegateBalanceOf(mockVault, twabController.SPONSORSHIP_ADDRESS()), 0);
+    assertEq(twabController.delegateBalanceOf(mockVault, SPONSORSHIP_ADDRESS), 0);
 
     twabController.sponsor(bob);
     vm.stopPrank();
@@ -451,7 +452,7 @@ contract TwabControllerTest is BaseTest {
     // Delegate balances have changed
     assertEq(twabController.delegateBalanceOf(mockVault, alice), 0);
     assertEq(twabController.delegateBalanceOf(mockVault, bob), _amount);
-    assertEq(twabController.delegateBalanceOf(mockVault, twabController.SPONSORSHIP_ADDRESS()), 0);
+    assertEq(twabController.delegateBalanceOf(mockVault, SPONSORSHIP_ADDRESS), 0);
   }
 
   function testMint() external {
@@ -657,7 +658,7 @@ contract TwabControllerTest is BaseTest {
 
   function testTransfer_rejectSponsorshipAddress() public {
     twabController.mint(alice, 100e18);
-    address sponsorship = twabController.SPONSORSHIP_ADDRESS();
+    address sponsorship = SPONSORSHIP_ADDRESS;
     vm.expectRevert(abi.encodeWithSelector(CannotTransferToSponsorshipAddress.selector));
     twabController.transfer(alice, sponsorship, 100e18);
   }
@@ -735,7 +736,7 @@ contract TwabControllerTest is BaseTest {
   }
 
   function testDelegateToSponsorship() external {
-    address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
+    address _sponsorshipAddress = SPONSORSHIP_ADDRESS;
 
     assertEq(twabController.delegateOf(mockVault, alice), alice);
 

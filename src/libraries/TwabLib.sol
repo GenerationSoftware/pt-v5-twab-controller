@@ -98,9 +98,9 @@ library TwabLib {
     uint96 _delegateAmount
   )
     internal
-    returns (ObservationLib.Observation memory observation, bool isNew, bool isObservationRecorded)
+    returns (ObservationLib.Observation memory observation, bool isNew, bool isObservationRecorded, AccountDetails memory accountDetails)
   {
-    AccountDetails memory accountDetails = _account.details;
+    accountDetails = _account.details;
     isObservationRecorded = _delegateAmount != uint96(0);
 
     accountDetails.balance += _amount;
@@ -136,9 +136,9 @@ library TwabLib {
     string memory _revertMessage
   )
     internal
-    returns (ObservationLib.Observation memory observation, bool isNew, bool isObservationRecorded)
+    returns (ObservationLib.Observation memory observation, bool isNew, bool isObservationRecorded, AccountDetails memory accountDetails)
   {
-    AccountDetails memory accountDetails = _account.details;
+    accountDetails = _account.details;
 
     if (accountDetails.balance < _amount) {
       revert BalanceLTAmount(accountDetails.balance, _amount, _revertMessage);
@@ -550,15 +550,14 @@ library TwabLib {
     AccountDetails memory _accountDetails,
     uint32 _targetTime
   ) private view returns (ObservationLib.Observation memory prevOrAtObservation) {
-    uint32 currentTime = uint32(block.timestamp);
-
-    uint16 oldestTwabIndex;
-
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
       return
         ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
     }
+    
+    uint32 currentTime = uint32(block.timestamp);
+    uint16 oldestTwabIndex;
 
     (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
     
