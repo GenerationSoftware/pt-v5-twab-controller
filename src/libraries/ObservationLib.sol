@@ -93,7 +93,7 @@ library ObservationLib {
       if (!targetAfterOrAt) {
         rightSide = currentIndex - 1;
       } else {
-        // Otherwise, we keep searching higher. To the left of the current index.
+        // Otherwise, we keep searching higher. To the right of the current index.
         leftSide = currentIndex + 1;
       }
     }
