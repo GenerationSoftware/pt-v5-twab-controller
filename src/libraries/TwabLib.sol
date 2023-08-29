@@ -575,7 +575,6 @@ library TwabLib {
     uint48 _targetTime
   ) private view returns (ObservationLib.Observation memory, uint16, bool) {
     ObservationLib.Observation memory prevOrAtObservation;
-    uint16 oldestTwabIndex;
 
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
