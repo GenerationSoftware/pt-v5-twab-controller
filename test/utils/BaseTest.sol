@@ -39,7 +39,7 @@ contract BaseTest is Test {
     console.log("-- Observations --");
     for (uint256 i = 0; i < amount; i++) {
       ObservationLib.Observation memory observation = account.observations[i];
-      console.log(i, observation.cumulativeBalance, observation.balance, observation.timestamp);
+      console.log(i, observation.cumulativeBalance, observation.timestamp);
     }
     console.log("--");
   }

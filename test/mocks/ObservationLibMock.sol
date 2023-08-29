@@ -14,11 +14,10 @@ contract ObservationLibMock {
    * Fills a ring buffer with observations
    * @param _timestamps the timestamps to create
    */
-  function populateObservations(uint32[] memory _timestamps) public {
+  function populateObservations(uint48[] memory _timestamps) public {
     for (uint i; i < _timestamps.length; i++) {
       observations[RingBufferLib.wrap(i, MAX_CARDINALITY)] = ObservationLib.Observation({
         timestamp: _timestamps[i],
-        balance: 0,
         cumulativeBalance: 0
       });
     }
@@ -43,28 +42,32 @@ contract ObservationLibMock {
    * @param _oldestObservationIndex Index of the oldest Observation. Left side of the circular buffer.
    * @param _target Timestamp at which we are searching the Observation.
    * @param _cardinality Cardinality of the circular buffer we are searching through.
-   * @param _time Timestamp at which we perform the binary search.
    * @return Observation recorded before, or at, the target.
    * @return Observation recorded at, or after, the target.
    */
   function binarySearch(
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
-    uint32 _target,
-    uint16 _cardinality,
-    uint32 _time
-  ) external view returns (ObservationLib.Observation memory, ObservationLib.Observation memory) {
+    uint48 _target,
+    uint16 _cardinality
+  ) external view returns (
+    ObservationLib.Observation memory,
+    uint16,
+    ObservationLib.Observation memory,
+    uint16
+  ) {
     (
       ObservationLib.Observation memory beforeOrAt,
-      ObservationLib.Observation memory afterOrAt
+      uint16 beforeOrAtIndex,
+      ObservationLib.Observation memory afterOrAt,
+      uint16 afterOrAtIndex
     ) = ObservationLib.binarySearch(
         observations,
         _newestObservationIndex,
         _oldestObservationIndex,
         _target,
-        _cardinality,
-        _time
+        _cardinality
       );
-    return (beforeOrAt, afterOrAt);
+    return (beforeOrAt, beforeOrAtIndex, afterOrAt, afterOrAtIndex);
   }
 }

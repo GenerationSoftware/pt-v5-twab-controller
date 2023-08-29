@@ -4,8 +4,6 @@ pragma solidity ^0.8.19;
 
 import "ring-buffer-lib/RingBufferLib.sol";
 
-import "./OverflowSafeComparatorLib.sol";
-
 /**
  * @dev Sets max ring buffer length in the Account.observations Observation list.
  *         As users transfer/mint/burn tickets new Observation checkpoints are recorded.
@@ -22,7 +20,6 @@ uint16 constant MAX_CARDINALITY = 9600; // with min period of 1 hour, this allow
  * @author PoolTogether Inc.
  */
 library ObservationLib {
-  using OverflowSafeComparatorLib for uint32;
 
   /**
    * @notice Observation, which includes an amount and timestamp.
@@ -31,9 +28,8 @@ library ObservationLib {
    * @param timestamp Recorded `timestamp`.
    */
   struct Observation {
-    uint128 cumulativeBalance;
-    uint96 balance;
-    uint32 timestamp;
+    uint160 cumulativeBalance;
+    uint48 timestamp;
   }
 
   /**
@@ -48,18 +44,18 @@ library ObservationLib {
    * @param _oldestObservationIndex Index of the oldest Observation. Left side of the circular buffer.
    * @param _target Timestamp at which we are searching the Observation.
    * @param _cardinality Cardinality of the circular buffer we are searching through.
-   * @param _time Timestamp at which we perform the binary search.
    * @return beforeOrAt Observation recorded before, or at, the target.
+   * @return beforeOrAtIndex Index of observation recorded before, or at, the target.
    * @return afterOrAt Observation recorded at, or after, the target.
+   * @return afterOrAtIndex Index of observation recorded at, or after, the target.
    */
   function binarySearch(
     Observation[MAX_CARDINALITY] storage _observations,
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
-    uint32 _target,
-    uint16 _cardinality,
-    uint32 _time
-  ) internal view returns (Observation memory beforeOrAt, Observation memory afterOrAt) {
+    uint48 _target,
+    uint16 _cardinality
+  ) internal view returns (Observation memory beforeOrAt, uint16 beforeOrAtIndex, Observation memory afterOrAt, uint16 afterOrAtIndex) {
     uint256 leftSide = _oldestObservationIndex;
     uint256 rightSide = _newestObservationIndex < leftSide
       ? leftSide + _cardinality - 1
@@ -71,8 +67,9 @@ library ObservationLib {
       // After each iteration, we narrow down the search to the left or the right side while still starting our search in the middle.
       currentIndex = (leftSide + rightSide) / 2;
 
-      beforeOrAt = _observations[uint16(RingBufferLib.wrap(currentIndex, _cardinality))];
-      uint32 beforeOrAtTimestamp = beforeOrAt.timestamp;
+      beforeOrAtIndex = uint16(RingBufferLib.wrap(currentIndex, _cardinality));
+      beforeOrAt = _observations[beforeOrAtIndex];
+      uint48 beforeOrAtTimestamp = beforeOrAt.timestamp;
 
       // We've landed on an uninitialized timestamp, keep searching higher (more recently).
       if (beforeOrAtTimestamp == 0) {
@@ -80,12 +77,13 @@ library ObservationLib {
         continue;
       }
 
-      afterOrAt = _observations[uint16(RingBufferLib.nextIndex(currentIndex, _cardinality))];
+      afterOrAtIndex = uint16(RingBufferLib.nextIndex(currentIndex, _cardinality));
+      afterOrAt = _observations[afterOrAtIndex];
 
-      bool targetAfterOrAt = beforeOrAtTimestamp.lte(_target, _time);
+      bool targetAfterOrAt = beforeOrAtTimestamp <= _target;
 
       // Check if we've found the corresponding Observation.
-      if (targetAfterOrAt && _target.lte(afterOrAt.timestamp, _time)) {
+      if (targetAfterOrAt && _target <= afterOrAt.timestamp) {
         break;
       }
 

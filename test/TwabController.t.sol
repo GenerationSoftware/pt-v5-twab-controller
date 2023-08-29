@@ -33,15 +33,15 @@ contract TwabControllerTest is BaseTest {
   event IncreasedBalance(
     address indexed vault,
     address indexed user,
-    uint96 amount,
-    uint96 delegateAmount
+    uint112 amount,
+    uint112 delegateAmount
   );
 
   event DecreasedBalance(
     address indexed vault,
     address indexed user,
-    uint96 amount,
-    uint96 delegateAmount
+    uint112 amount,
+    uint112 delegateAmount
   );
 
   event ObservationRecorded(
@@ -55,9 +55,9 @@ contract TwabControllerTest is BaseTest {
 
   event Delegated(address indexed vault, address indexed delegator, address indexed delegate);
 
-  event IncreasedTotalSupply(address indexed vault, uint96 amount, uint96 delegateAmount);
+  event IncreasedTotalSupply(address indexed vault, uint112 amount, uint112 delegateAmount);
 
-  event DecreasedTotalSupply(address indexed vault, uint96 amount, uint96 delegateAmount);
+  event DecreasedTotalSupply(address indexed vault, uint112 amount, uint112 delegateAmount);
 
   event TotalSupplyObservationRecorded(
     address indexed vault,
@@ -159,7 +159,7 @@ contract TwabControllerTest is BaseTest {
     assertEq(twabController.getBalanceAt(mockVault, alice, PERIOD_OFFSET), 0);
   }
 
-  function testGetBalanceAt_safeBalance() public {
+  function testGetBalanceAt_safeBalance_success() public {
     vm.startPrank(mockVault);
 
     // Mint at history start
@@ -468,7 +468,6 @@ contract TwabControllerTest is BaseTest {
       _amount,
       true,
       ObservationLib.Observation({
-        balance: _amount,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -484,7 +483,6 @@ contract TwabControllerTest is BaseTest {
       _amount,
       true,
       ObservationLib.Observation({
-        balance: _amount,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -520,7 +518,6 @@ contract TwabControllerTest is BaseTest {
       0,
       false,
       ObservationLib.Observation({
-        balance: 0,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -536,7 +533,6 @@ contract TwabControllerTest is BaseTest {
       0,
       false,
       ObservationLib.Observation({
-        balance: 0,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -567,7 +563,6 @@ contract TwabControllerTest is BaseTest {
       _amount,
       true,
       ObservationLib.Observation({
-        balance: _amount,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -583,7 +578,6 @@ contract TwabControllerTest is BaseTest {
       _amount,
       true,
       ObservationLib.Observation({
-        balance: _amount,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -601,7 +595,6 @@ contract TwabControllerTest is BaseTest {
       0,
       false,
       ObservationLib.Observation({
-        balance: 0,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
@@ -617,7 +610,6 @@ contract TwabControllerTest is BaseTest {
       0,
       false,
       ObservationLib.Observation({
-        balance: 0,
         cumulativeBalance: 0,
         timestamp: uint32(block.timestamp)
       })
