@@ -288,6 +288,14 @@ library TwabLib {
       (_endTime - _startTime);
   }
 
+  /**
+   * @notice Retrieves a delegate balance for a specific observation record
+   * @param _observations The ring buffer of observations
+   * @param _accountDetails The account details
+   * @param _observation The observation whose delegate balance we want to determine
+   * @param _observationIndex The index of the observation in the ring buffer
+   * @return The delegate balance held at the time of the observation
+   */
   function _getBalanceOf(
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
@@ -566,14 +574,16 @@ library TwabLib {
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @param _targetTime The timestamp to look up
-   * @return prevOrAtObservation The observation
+   * @return obs The observation
+   * @return index The index of the observation. If the obs is prior to history, this will be zero
+   * @return isBeforeHistory True if the observation is made up due to a lack of sufficient history
    */
   function _getPreviousOrAtObservation(
     uint48 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint48 _targetTime
-  ) private view returns (ObservationLib.Observation memory, uint16, bool) {
+  ) private view returns (ObservationLib.Observation memory obs, uint16 index, bool isBeforeHistory) {
     ObservationLib.Observation memory prevOrAtObservation;
 
     // If there are no observations, return a zeroed observation
