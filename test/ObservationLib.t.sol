@@ -29,7 +29,6 @@ contract ObservationLibTest is BaseTest {
     uint24 newestObservationIndex = 5;
     uint24 oldestObservationIndex = 0;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     // Left side
     (
@@ -73,7 +72,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 10;
     uint16 cardinality = 4;
-    uint48 time = 30;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -104,7 +102,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 4;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -131,7 +128,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 5;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     observationLibMock.binarySearch(
       newestObservationIndex,
@@ -149,7 +145,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 10;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -176,7 +171,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 15;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     observationLibMock.binarySearch(
       newestObservationIndex,
@@ -195,7 +189,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 10;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -222,7 +215,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 15;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -249,7 +241,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 20;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -277,7 +268,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 10;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -305,7 +295,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 20;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,
@@ -333,7 +322,6 @@ contract ObservationLibTest is BaseTest {
     uint24 oldestObservationIndex = 0;
     uint48 target = 30;
     uint16 cardinality = uint16(t.length);
-    uint48 time = 100;
 
     (
       ObservationLib.Observation memory beforeOrAt,

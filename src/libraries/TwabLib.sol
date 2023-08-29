@@ -585,7 +585,6 @@ library TwabLib {
       );
     }
     
-    uint32 currentTime = uint32(block.timestamp);
     uint16 oldestTwabIndex;
 
     (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
