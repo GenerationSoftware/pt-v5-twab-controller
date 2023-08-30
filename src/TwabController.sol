@@ -636,15 +636,15 @@ contract TwabController {
 
   /**
    * @notice Sets a delegate for a user which forwards the delegateBalance tied to the user's
-   *          balance to the delegate's delegateBalance.
+   * balance to the delegate's delegateBalance. "Sponsoring" means the funds aren't delegated
+   * to anyone; this can be done by passing address(0) or the SPONSORSHIP_ADDRESS as the delegate.
    * @param _vault The vault for which the delegate is being set
    * @param _from the address to delegate from
    * @param _to the address to delegate to
    */
   function _delegate(address _vault, address _from, address _to) internal {
     address _currentDelegate = _delegateOf(_vault, _from);
-    // Treat address(0) as un-delegating. They could also pass the sponsorship address, but this lets
-    // them do so without knowing the sponsorship special value address.
+    // address(0) is interpreted as sponsoring, so they don't need to know the sponsorship address.
     address to = _to == address(0) ? SPONSORSHIP_ADDRESS : _to;
     if (to == _currentDelegate) {
       revert SameDelegateAlreadySet(to);

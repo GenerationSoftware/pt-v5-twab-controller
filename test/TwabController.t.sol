@@ -712,6 +712,40 @@ contract TwabControllerTest is BaseTest {
     vm.stopPrank();
   }
 
+  function testDelegateOf_default() public {
+    assertEq(twabController.delegateOf(mockVault, alice), alice);
+  }
+
+  function testDelegateOf_sponsorship() public {
+    vm.startPrank(mockVault);
+    twabController.sponsor(alice);
+    assertEq(twabController.delegateOf(mockVault, alice), SPONSORSHIP_ADDRESS);
+  }
+
+  function testDelegateOf_addressZero() public {
+    vm.startPrank(alice);
+    twabController.delegate(mockVault, address(0));
+    assertEq(twabController.delegateOf(mockVault, alice), SPONSORSHIP_ADDRESS);
+  }
+
+  function testDelegateOf_address() public {
+    address bob = makeAddr("bob");
+    vm.startPrank(alice);
+    twabController.delegate(mockVault, bob);
+    assertEq(twabController.delegateOf(mockVault, alice), bob);
+  }
+
+  function testDelegate_toSelf() public {
+    vm.startPrank(mockVault);
+
+    uint96 _amount = 1000e18;
+    twabController.mint(alice, _amount);
+
+    assertEq(twabController.delegateOf(mockVault, alice), alice);
+    assertEq(twabController.delegateBalanceOf(mockVault, alice), _amount);
+    assertEq(twabController.balanceOf(mockVault, alice), _amount);
+  }
+
   function testDelegate_interpretBurnAddressAsSponsorship() external {
     uint96 _amount = 1000e18;
     twabController.mint(alice, _amount);
