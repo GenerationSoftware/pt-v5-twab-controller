@@ -11,6 +11,7 @@ import {
   MINIMUM_PERIOD_LENGTH,
   PeriodLengthTooShort,
   SPONSORSHIP_ADDRESS,
+  TransferToZeroAddress,
   PeriodOffsetInFuture
 } from "../src/TwabController.sol";
 import {
@@ -733,6 +734,23 @@ contract TwabControllerTest is BaseTest {
     vm.startPrank(alice);
     twabController.delegate(mockVault, bob);
     assertEq(twabController.delegateOf(mockVault, alice), bob);
+  }
+
+  function testMint_toZero() public {
+    vm.startPrank(mockVault);
+
+    uint96 _amount = 1000e18;
+    vm.expectRevert(abi.encodeWithSelector(TransferToZeroAddress.selector));
+    twabController.mint(address(0), _amount);
+  }
+
+  function testTransfer_toZero() public {
+    vm.startPrank(mockVault);
+
+    uint96 _amount = 1000e18;
+    twabController.mint(alice, _amount);
+    vm.expectRevert(abi.encodeWithSelector(TransferToZeroAddress.selector));
+    twabController.transfer(alice, address(0), _amount);
   }
 
   function testDelegate_toSelf() public {
