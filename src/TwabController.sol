@@ -24,6 +24,7 @@ error TransferToZeroAddress();
 // The minimum period length
 uint48 constant MINIMUM_PERIOD_LENGTH = 1 hours;
 
+// Allows users to revoke their chances to win by delegating to the sponsorship address.
 address constant SPONSORSHIP_ADDRESS = address(1);
 
 /**
@@ -40,8 +41,6 @@ address constant SPONSORSHIP_ADDRESS = address(1);
  */
 contract TwabController {
   using SafeCast for uint256;
-
-  /// @notice Allows users to revoke their chances to win by delegating to the sponsorship address.
   
   /// @notice Sets the minimum period length for Observations. When a period elapses, a new Observation is recorded, otherwise the most recent Observation is updated.
   uint48 public immutable PERIOD_LENGTH;
