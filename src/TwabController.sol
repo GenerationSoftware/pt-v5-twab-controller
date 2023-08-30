@@ -18,6 +18,9 @@ error PeriodLengthTooShort();
 /// @param periodOffset The period offset that was passed in
 error PeriodOffsetInFuture(uint48 periodOffset);
 
+/// @notice Emitted when a user tries to mint or transfer to the zero address
+error TransferToZeroAddress();
+
 // The minimum period length
 uint48 constant MINIMUM_PERIOD_LENGTH = 1 hours;
 
@@ -447,6 +450,9 @@ contract TwabController {
    * @param _amount The amount to mint
    */
   function mint(address _to, uint112 _amount) external {
+    if (_to == address(0)) {
+      revert TransferToZeroAddress();
+    }
     _transferBalance(msg.sender, address(0), _to, _amount);
   }
 
@@ -471,6 +477,9 @@ contract TwabController {
    * @param _amount The amount to transfer
    */
   function transfer(address _from, address _to, uint112 _amount) external {
+    if (_to == address(0)) {
+      revert TransferToZeroAddress();
+    }
     _transferBalance(msg.sender, _from, _to, _amount);
   }
 
