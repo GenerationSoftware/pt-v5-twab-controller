@@ -656,7 +656,7 @@ contract TwabController {
       _vault,
       _currentDelegate,
       _to,
-      SafeCast.toUint96(userObservations[_vault][_from].details.balance)
+      SafeCast.toUint112(userObservations[_vault][_from].details.balance)
     );
 
     emit Delegated(_vault, _from, to);
