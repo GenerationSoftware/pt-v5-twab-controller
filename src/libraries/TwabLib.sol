@@ -3,8 +3,6 @@ pragma solidity ^0.8.19;
 
 import "ring-buffer-lib/RingBufferLib.sol";
 
-import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
-import "./OverflowSafeComparatorLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
 
 /// @notice Emitted when a balance is decreased by an amount that exceeds the amount available.
@@ -49,7 +47,6 @@ error InsufficientHistory(uint48 requestedTimestamp, uint48 oldestTimestamp);
  *         within safe boundaries.
  */
 library TwabLib {
-  using OverflowSafeComparatorLib for uint32;
 
   /**
    * @notice Struct ring buffer parameters for single user Account.
