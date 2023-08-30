@@ -18,7 +18,7 @@ error PeriodLengthTooShort();
 /// @param periodOffset The period offset that was passed in
 error PeriodOffsetInFuture(uint48 periodOffset);
 
-/// @notice Emitted when a user to tries to mint or transfer to the zero address
+/// @notice Emitted when a user tries to mint or transfer to the zero address
 error TransferToZeroAddress();
 
 // The minimum period length
