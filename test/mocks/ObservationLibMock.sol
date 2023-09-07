@@ -50,12 +50,11 @@ contract ObservationLibMock {
     uint24 _oldestObservationIndex,
     uint48 _target,
     uint16 _cardinality
-  ) external view returns (
-    ObservationLib.Observation memory,
-    uint16,
-    ObservationLib.Observation memory,
-    uint16
-  ) {
+  )
+    external
+    view
+    returns (ObservationLib.Observation memory, uint16, ObservationLib.Observation memory, uint16)
+  {
     (
       ObservationLib.Observation memory beforeOrAt,
       uint16 beforeOrAtIndex,

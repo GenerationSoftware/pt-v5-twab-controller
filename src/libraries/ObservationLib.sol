@@ -20,7 +20,6 @@ uint16 constant MAX_CARDINALITY = 9600; // with min period of 1 hour, this allow
  * @author PoolTogether Inc.
  */
 library ObservationLib {
-
   /**
    * @notice Observation, which includes an amount and timestamp.
    * @param balance `balance` at `timestamp`.
@@ -55,7 +54,16 @@ library ObservationLib {
     uint24 _oldestObservationIndex,
     uint48 _target,
     uint16 _cardinality
-  ) internal view returns (Observation memory beforeOrAt, uint16 beforeOrAtIndex, Observation memory afterOrAt, uint16 afterOrAtIndex) {
+  )
+    internal
+    view
+    returns (
+      Observation memory beforeOrAt,
+      uint16 beforeOrAtIndex,
+      Observation memory afterOrAt,
+      uint16 afterOrAtIndex
+    )
+  {
     uint256 leftSide = _oldestObservationIndex;
     uint256 rightSide = _newestObservationIndex < leftSide
       ? leftSide + _cardinality - 1

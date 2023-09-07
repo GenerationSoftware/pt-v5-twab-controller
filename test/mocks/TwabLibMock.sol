@@ -15,7 +15,10 @@ contract TwabLibMock {
   function increaseBalances(
     uint96 _amount,
     uint96 _delegateAmount
-  ) external returns (ObservationLib.Observation memory, bool, bool, TwabLib.AccountDetails memory) {
+  )
+    external
+    returns (ObservationLib.Observation memory, bool, bool, TwabLib.AccountDetails memory)
+  {
     (
       ObservationLib.Observation memory observation,
       bool isNewObservation,
@@ -30,7 +33,10 @@ contract TwabLibMock {
     uint96 _amount,
     uint96 _delegateAmount,
     string memory _revertMessage
-  ) external returns (ObservationLib.Observation memory, bool, bool, TwabLib.AccountDetails memory) {
+  )
+    external
+    returns (ObservationLib.Observation memory, bool, bool, TwabLib.AccountDetails memory)
+  {
     (
       ObservationLib.Observation memory observation,
       bool isNewObservation,
@@ -120,16 +126,12 @@ contract TwabLibMock {
     return timestamp;
   }
 
-  function getPeriodStartTime(
-    uint48 _period
-  ) external view returns (uint48) {
+  function getPeriodStartTime(uint48 _period) external view returns (uint48) {
     uint48 start = TwabLib.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
     return start;
   }
 
-  function getPeriodEndTime(
-    uint48 _period
-  ) external view returns (uint48) {
+  function getPeriodEndTime(uint48 _period) external view returns (uint48) {
     uint48 end = TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
     return end;
   }
@@ -143,11 +145,7 @@ contract TwabLibMock {
   }
 
   function hasFinalized(uint48 _timestamp) external view returns (bool) {
-    bool isSafe = TwabLib.hasFinalized(
-      PERIOD_LENGTH,
-      PERIOD_OFFSET,
-      _timestamp
-    );
+    bool isSafe = TwabLib.hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
     return isSafe;
   }
 }

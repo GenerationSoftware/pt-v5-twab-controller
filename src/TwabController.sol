@@ -41,7 +41,7 @@ address constant SPONSORSHIP_ADDRESS = address(1);
  */
 contract TwabController {
   using SafeCast for uint256;
-  
+
   /// @notice Sets the minimum period length for Observations. When a period elapses, a new Observation is recorded, otherwise the most recent Observation is updated.
   uint48 public immutable PERIOD_LENGTH;
 
@@ -257,7 +257,14 @@ contract TwabController {
     uint48 periodEndOnOrAfterTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
-    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, _periodEndOnOrAfter(periodEndOnOrAfterTime));
+    return
+      TwabLib.getBalanceAt(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
+        _account.observations,
+        _account.details,
+        _periodEndOnOrAfter(periodEndOnOrAfterTime)
+      );
   }
 
   /**
@@ -266,9 +273,19 @@ contract TwabController {
    * @param periodEndOnOrAfterTime The time in the past for which the balance is being queried. The time will be snapped to a period end time on or after the timestamp.
    * @return The total supply at the target time
    */
-  function getTotalSupplyAt(address vault, uint48 periodEndOnOrAfterTime) external view returns (uint256) {
+  function getTotalSupplyAt(
+    address vault,
+    uint48 periodEndOnOrAfterTime
+  ) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
-    return TwabLib.getBalanceAt(PERIOD_LENGTH, PERIOD_OFFSET, _account.observations, _account.details, _periodEndOnOrAfter(periodEndOnOrAfterTime));
+    return
+      TwabLib.getBalanceAt(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
+        _account.observations,
+        _account.details,
+        _periodEndOnOrAfter(periodEndOnOrAfterTime)
+      );
   }
 
   /**
@@ -348,11 +365,12 @@ contract TwabController {
     if ((_timestamp - PERIOD_OFFSET) % PERIOD_LENGTH == 0) {
       return _timestamp;
     }
-    return TwabLib.getPeriodEndTime(
-      PERIOD_LENGTH,
-      PERIOD_OFFSET,
-      TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp)
-    );
+    return
+      TwabLib.getPeriodEndTime(
+        PERIOD_LENGTH,
+        PERIOD_OFFSET,
+        TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp)
+      );
   }
 
   /**
