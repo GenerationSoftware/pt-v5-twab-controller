@@ -630,12 +630,7 @@ library TwabLib {
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
     uint48 _targetTime
-  )
-    private
-    view
-    returns (ObservationLib.Observation memory obs, uint16 index, bool isBeforeHistory)
-  {
-    ObservationLib.Observation memory prevOrAtObservation;
+  ) private view returns (ObservationLib.Observation memory obs, uint16 index, bool isBeforeHistory) {
 
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
@@ -645,11 +640,9 @@ library TwabLib {
         true
       );
     }
-
-    uint16 oldestTwabIndex;
-
-    (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
-
+    
+    (uint16 oldestTwabIndex, ObservationLib.Observation memory prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
+    
     // if the requested time is older than the oldest observation
     if (_targetTime < prevOrAtObservation.timestamp) {
       // if the user didn't have any activity prior to the oldest observation, then we know they had a zero balance
@@ -670,11 +663,8 @@ library TwabLib {
       return (prevOrAtObservation, oldestTwabIndex, false);
     }
 
-    uint16 newestTwabIndex;
-    ObservationLib.Observation memory afterOrAtObservation;
-
     // Find the newest observation
-    (newestTwabIndex, afterOrAtObservation) = getNewestObservation(_observations, _accountDetails);
+    (uint16 newestTwabIndex, ObservationLib.Observation memory afterOrAtObservation) = getNewestObservation(_observations, _accountDetails);
     // if the target time is at or after the newest, return it
     if (_targetTime >= afterOrAtObservation.timestamp) {
       return (afterOrAtObservation, newestTwabIndex, false);
