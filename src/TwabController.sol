@@ -77,7 +77,7 @@ contract TwabController {
   );
 
   /**
-   * @notice Emited when a balance or delegateBalance is decreased.
+   * @notice Emitted when a balance or delegateBalance is decreased.
    * @param vault the vault for which the balance decreased
    * @param user the users whose balance decreased
    * @param amount the amount the balance decreased by
@@ -91,7 +91,7 @@ contract TwabController {
   );
 
   /**
-   * @notice Emited when an Observation is recorded to the Ring Buffer.
+   * @notice Emitted when an Observation is recorded to the Ring Buffer.
    * @param vault the vault for which the Observation was recorded
    * @param user the users whose Observation was recorded
    * @param balance the resulting balance
@@ -133,7 +133,7 @@ contract TwabController {
   event DecreasedTotalSupply(address indexed vault, uint112 amount, uint112 delegateAmount);
 
   /**
-   * @notice Emited when a Total Supply Observation is recorded to the Ring Buffer.
+   * @notice Emitted when a Total Supply Observation is recorded to the Ring Buffer.
    * @param vault the vault for which the Observation was recorded
    * @param balance the resulting balance
    * @param delegateBalance the resulting delegated balance
@@ -374,7 +374,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the newest observation  for a user.
+   * @notice Looks up the newest observation for a user.
    * @param vault the vault for which the observation is being queried
    * @param user the user whose observation is being queried
    * @return index The index of the observation
@@ -389,7 +389,7 @@ contract TwabController {
   }
 
   /**
-   * @notice Looks up the oldest observation  for a user.
+   * @notice Looks up the oldest observation for a user.
    * @param vault the vault for which the observation is being queried
    * @param user the user whose observation is being queried
    * @return index The index of the observation
