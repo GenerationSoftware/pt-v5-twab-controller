@@ -34,18 +34,4 @@ contract BaseTest is Test {
     vm.label(charlie, "Charlie");
     vm.label(dave, "Dave");
   }
-
-  function logObservations(TwabLib.Account memory account, uint256 amount) internal view {
-    console.log("-- Observations --");
-    for (uint256 i = 0; i < amount; i++) {
-      ObservationLib.Observation memory observation = account.observations[i];
-      console.log(i, observation.cumulativeBalance, observation.timestamp);
-    }
-    console.log("--");
-  }
-
-  function assertAlmostEqual(uint256 a, uint256 b, uint256 maxDelta) internal {
-    uint256 delta = a > b ? a - b : b - a;
-    assertTrue(delta <= maxDelta);
-  }
 }
