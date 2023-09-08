@@ -231,9 +231,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         (, newestObservation) = twabController.getNewestTotalSupplyObservation(vault);
 
         // Check if the newest observation is safe for this vault
-        isVaultsSafe =
-          isVaultsSafe &&
-          twabController.hasFinalized(newestObservation.timestamp);
+        isVaultsSafe = isVaultsSafe && twabController.hasFinalized(newestObservation.timestamp);
 
         // For Each Actor
         for (uint256 j; j < _addrs.actors[vault].length; ++j) {
@@ -244,9 +242,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
             (, newestObservation) = twabController.getNewestObservation(vault, actor);
 
             // Check if the newest observation is safe for this actor
-            isActorsSafe =
-              isActorsSafe &&
-              twabController.hasFinalized(newestObservation.timestamp);
+            isActorsSafe = isActorsSafe && twabController.hasFinalized(newestObservation.timestamp);
           }
         }
       }
@@ -274,16 +270,12 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         (, newestObservation) = twabController.getNewestTotalSupplyObservation(vault);
 
         // Check if the newest observation is safe for this vault
-        isVaultsSafe =
-          isVaultsSafe &&
-          twabController.hasFinalized(newestObservation.timestamp);
+        isVaultsSafe = isVaultsSafe && twabController.hasFinalized(newestObservation.timestamp);
 
         // Check if each observation is safe for this vault
         for (uint256 o_i; o_i < account.details.cardinality; ++o_i) {
           observation = account.observations[o_i];
-          isVaultsSafe =
-            isVaultsSafe &&
-            twabController.hasFinalized(observation.timestamp);
+          isVaultsSafe = isVaultsSafe && twabController.hasFinalized(observation.timestamp);
         }
 
         // Check if each period end timestamp is safe for this vault
@@ -303,16 +295,12 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
             (, newestObservation) = twabController.getNewestObservation(vault, actor);
 
             // Check if the newest observation is safe for this actor
-            isActorsSafe =
-              isActorsSafe &&
-              twabController.hasFinalized(newestObservation.timestamp);
+            isActorsSafe = isActorsSafe && twabController.hasFinalized(newestObservation.timestamp);
 
             // Check if each observation is safe for this actor
             for (uint256 o_i; o_i < account.details.cardinality; ++o_i) {
               observation = account.observations[o_i];
-              isActorsSafe =
-                isActorsSafe &&
-                twabController.hasFinalized(observation.timestamp);
+              isActorsSafe = isActorsSafe && twabController.hasFinalized(observation.timestamp);
             }
 
             // Check if each period end timestamp is safe for this actor
@@ -349,11 +337,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         // If there's no range to query across, skip
         if (finalizedBy > PERIOD_OFFSET) {
           // Add TWAB between time start and newest observation for that vault's total supply
-          vaultAcc += twabController.getTotalSupplyTwabBetween(
-            vault,
-            PERIOD_OFFSET,
-            finalizedBy
-          );
+          vaultAcc += twabController.getTotalSupplyTwabBetween(vault, PERIOD_OFFSET, finalizedBy);
 
           // For Each Actor
           for (uint256 j; j < _addrs.actors[vault].length; ++j) {
