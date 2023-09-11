@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.19;
 
-import { console2 } from "forge-std/console2.sol";
-
 import { TwabLib, BalanceLTAmount, DelegateBalanceLTAmount, TimestampNotFinalized, InsufficientHistory } from "../src/libraries/TwabLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 
@@ -423,9 +421,6 @@ contract TwabLibTest is BaseTest {
     initialTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH);
     currentTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH * 2);
 
-    // console2.log("initialTimestamp", initialTimestamp);
-    // console2.log("currentTimestamp", currentTimestamp);
-
     vm.warp(initialTimestamp);
     twabLibMock.increaseBalances(0, amount);
   }
@@ -497,9 +492,6 @@ contract TwabLibTest is BaseTest {
       uint32 thirdPeriodStartTime,
 
     ) = averageDelegateBalanceBetweenSingleSetup();
-
-    // console2.log("testGetTwabBetweenSingleAfter secondPeriodStartTime", secondPeriodStartTime);
-    // console2.log("testGetTwabBetweenSingleAfter thirdPeriodStartTime", thirdPeriodStartTime);
 
     vm.warp(thirdPeriodStartTime);
     uint256 _balance = twabLibMock.getTwabBetween(

@@ -241,6 +241,7 @@ library TwabLib {
       uint16 index,
       bool isBeforeHistory
     ) = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _targetTime);
+
     if (isBeforeHistory) {
       return 0;
     } else {
@@ -451,33 +452,23 @@ library TwabLib {
     uint48 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails
-  )
-    private
-    view
-    returns (uint16 index, ObservationLib.Observation memory newestObservation, bool isNew)
-  {
-    uint16 newestIndex;
-    (newestIndex, newestObservation) = getNewestObservation(_observations, _accountDetails);
+  ) private view returns (uint16, ObservationLib.Observation memory, bool) {
+    (
+      uint16 newestIndex,
+      ObservationLib.Observation memory newestObservation
+    ) = getNewestObservation(_observations, _accountDetails);
 
     // if we're in the same block, return
     if (newestObservation.timestamp == block.timestamp) {
       return (newestIndex, newestObservation, false);
     }
 
-    uint48 currentPeriod = _getTimestampPeriod(
-      PERIOD_LENGTH,
-      PERIOD_OFFSET,
-      uint48(block.timestamp)
-    );
-
-    uint48 newestObservationPeriod = _getTimestampPeriod(
-      PERIOD_LENGTH,
-      PERIOD_OFFSET,
-      newestObservation.timestamp
-    );
-
     // Create a new Observation if it's the first period or the current time falls within a new period
-    if (_accountDetails.cardinality == 0 || currentPeriod > newestObservationPeriod) {
+    if (
+      _accountDetails.cardinality == 0 ||
+      _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, uint48(block.timestamp)) >
+      _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, newestObservation.timestamp)
+    ) {
       return (_accountDetails.nextObservationIndex, newestObservation, true);
     }
 
@@ -635,8 +626,6 @@ library TwabLib {
     view
     returns (ObservationLib.Observation memory obs, uint16 index, bool isBeforeHistory)
   {
-    ObservationLib.Observation memory prevOrAtObservation;
-
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
       return (
@@ -646,9 +635,10 @@ library TwabLib {
       );
     }
 
-    uint16 oldestTwabIndex;
-
-    (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
+    (
+      uint16 oldestTwabIndex,
+      ObservationLib.Observation memory prevOrAtObservation
+    ) = getOldestObservation(_observations, _accountDetails);
 
     // if the requested time is older than the oldest observation
     if (_targetTime < prevOrAtObservation.timestamp) {
@@ -670,11 +660,11 @@ library TwabLib {
       return (prevOrAtObservation, oldestTwabIndex, false);
     }
 
-    uint16 newestTwabIndex;
-    ObservationLib.Observation memory afterOrAtObservation;
-
     // Find the newest observation
-    (newestTwabIndex, afterOrAtObservation) = getNewestObservation(_observations, _accountDetails);
+    (
+      uint16 newestTwabIndex,
+      ObservationLib.Observation memory afterOrAtObservation
+    ) = getNewestObservation(_observations, _accountDetails);
     // if the target time is at or after the newest, return it
     if (_targetTime >= afterOrAtObservation.timestamp) {
       return (afterOrAtObservation, newestTwabIndex, false);
