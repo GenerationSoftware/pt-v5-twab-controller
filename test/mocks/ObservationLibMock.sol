@@ -14,10 +14,11 @@ contract ObservationLibMock {
    * Fills a ring buffer with observations
    * @param _timestamps the timestamps to create
    */
-  function populateObservations(uint48[] memory _timestamps) public {
+  function populateObservations(uint32[] memory _timestamps) public {
     for (uint i; i < _timestamps.length; i++) {
       observations[RingBufferLib.wrap(i, MAX_CARDINALITY)] = ObservationLib.Observation({
         timestamp: _timestamps[i],
+        balance: 0,
         cumulativeBalance: 0
       });
     }
@@ -42,14 +43,16 @@ contract ObservationLibMock {
    * @param _oldestObservationIndex Index of the oldest Observation. Left side of the circular buffer.
    * @param _target Timestamp at which we are searching the Observation.
    * @param _cardinality Cardinality of the circular buffer we are searching through.
+   * @param _currentTime Current time
    * @return Observation recorded before, or at, the target.
    * @return Observation recorded at, or after, the target.
    */
   function binarySearch(
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
-    uint48 _target,
-    uint16 _cardinality
+    uint32 _target,
+    uint16 _cardinality,
+    uint32 _currentTime
   )
     external
     view
@@ -65,7 +68,8 @@ contract ObservationLibMock {
         _newestObservationIndex,
         _oldestObservationIndex,
         _target,
-        _cardinality
+        _cardinality,
+        _currentTime
       );
     return (beforeOrAt, beforeOrAtIndex, afterOrAt, afterOrAtIndex);
   }

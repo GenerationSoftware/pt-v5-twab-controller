@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import "forge-std/console2.sol";
+
 import "ring-buffer-lib/RingBufferLib.sol";
 
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
@@ -9,13 +11,13 @@ import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
 /// @param balance The current balance of the account
 /// @param amount The amount being decreased from the account's balance
 /// @param message An additional message describing the error
-error BalanceLTAmount(uint112 balance, uint112 amount, string message);
+error BalanceLTAmount(uint96 balance, uint96 amount, string message);
 
 /// @notice Emitted when a delegate balance is decreased by an amount that exceeds the amount available.
 /// @param delegateBalance The current delegate balance of the account
 /// @param delegateAmount The amount being decreased from the account's delegate balance
 /// @param message An additional message describing the error
-error DelegateBalanceLTAmount(uint112 delegateBalance, uint112 delegateAmount, string message);
+error DelegateBalanceLTAmount(uint96 delegateBalance, uint96 delegateAmount, string message);
 
 /// @notice Emitted when a request is made for a twab that is not yet finalized.
 /// @param timestamp The requested timestamp
@@ -30,7 +32,7 @@ error InvalidTimeRange(uint256 start, uint256 end);
 /// @notice Emitted when there is insufficient history to lookup a twab time range
 /// @param requestedTimestamp The timestamp requested
 /// @param oldestTimestamp The oldest timestamp that can be read
-error InsufficientHistory(uint48 requestedTimestamp, uint48 oldestTimestamp);
+error InsufficientHistory(uint32 requestedTimestamp, uint32 oldestTimestamp);
 
 /**
  * @title  PoolTogether V5 TwabLib (Library)
@@ -56,8 +58,8 @@ library TwabLib {
    *                    Used to set initial boundary conditions for an efficient binary search.
    */
   struct AccountDetails {
-    uint112 balance;
-    uint112 delegateBalance;
+    uint96 balance;
+    uint96 delegateBalance;
     uint16 nextObservationIndex;
     uint16 cardinality;
   }
@@ -83,14 +85,14 @@ library TwabLib {
    * @param _delegateAmount The amount to increase the delegate balance by
    * @return observation The new/updated observation
    * @return isNew Whether or not the observation is new or overwrote a previous one
-   * @return isObservationRecorded Whether or not the observation was recorded to storage
+   * @return isObservationRecorded Whether or not an observation was recorded to storage
    */
   function increaseBalances(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     Account storage _account,
-    uint112 _amount,
-    uint112 _delegateAmount
+    uint96 _amount,
+    uint96 _delegateAmount
   )
     internal
     returns (
@@ -101,7 +103,10 @@ library TwabLib {
     )
   {
     accountDetails = _account.details;
-    isObservationRecorded = _delegateAmount != uint112(0);
+    isObservationRecorded = _delegateAmount != uint96(0);
+
+    accountDetails.balance += _amount;
+    accountDetails.delegateBalance += _delegateAmount;
 
     // Only record a new Observation if the users delegateBalance has changed.
     if (isObservationRecorded) {
@@ -112,9 +117,6 @@ library TwabLib {
         _account
       );
     }
-
-    accountDetails.balance += _amount;
-    accountDetails.delegateBalance += _delegateAmount;
 
     _account.details = accountDetails;
   }
@@ -133,11 +135,11 @@ library TwabLib {
    * @return isObservationRecorded Whether or not the observation was recorded to storage
    */
   function decreaseBalances(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     Account storage _account,
-    uint112 _amount,
-    uint112 _delegateAmount,
+    uint96 _amount,
+    uint96 _delegateAmount,
     string memory _revertMessage
   )
     internal
@@ -161,7 +163,12 @@ library TwabLib {
       );
     }
 
-    isObservationRecorded = _delegateAmount != uint112(0);
+    isObservationRecorded = _delegateAmount != uint96(0);
+
+    unchecked {
+      accountDetails.balance -= _amount;
+      accountDetails.delegateBalance -= _delegateAmount;
+    }
 
     // Only record a new Observation if the users delegateBalance has changed.
     if (isObservationRecorded) {
@@ -171,11 +178,6 @@ library TwabLib {
         accountDetails,
         _account
       );
-    }
-
-    unchecked {
-      accountDetails.balance -= _amount;
-      accountDetails.delegateBalance -= _delegateAmount;
     }
 
     _account.details = accountDetails;
@@ -230,23 +232,14 @@ library TwabLib {
    * @return balance The balance at the target time
    */
   function getBalanceAt(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
-    uint48 _targetTime
+    uint32 _targetTime
   ) internal view requireFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _targetTime) returns (uint256) {
-    (
-      ObservationLib.Observation memory prevOrAtObservation,
-      uint16 index,
-      bool isBeforeHistory
-    ) = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _targetTime);
-
-    if (isBeforeHistory) {
-      return 0;
-    } else {
-      return _getBalanceOf(_observations, _accountDetails, prevOrAtObservation, index);
-    }
+    ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _targetTime);
+    return prevOrAtObservation.balance;
   }
 
   /**
@@ -261,49 +254,35 @@ library TwabLib {
    * @return twab The TWAB for the time range
    */
   function getTwabBetween(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
-    uint48 _startTime,
-    uint48 _endTime
+    uint32 _startTime,
+    uint32 _endTime
   ) internal view requireFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _endTime) returns (uint256) {
     if (_startTime > _endTime) {
       revert InvalidTimeRange(_startTime, _endTime);
     }
 
-    (
-      ObservationLib.Observation memory endObservation,
-      uint16 endIndex,
-
-    ) = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _endTime);
+    ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _endTime);
 
     if (_startTime == _endTime) {
-      return _getBalanceOf(_observations, _accountDetails, endObservation, endIndex);
+      return endObservation.balance;
     }
 
-    (
-      ObservationLib.Observation memory startObservation,
-      uint16 startIndex,
-
-    ) = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _startTime);
+    ObservationLib.Observation memory startObservation = _getPreviousOrAtObservation(PERIOD_OFFSET, _observations, _accountDetails, _startTime);
 
     if (startObservation.timestamp != _startTime) {
       startObservation = _calculateTemporaryObservation(
-        _observations,
-        _accountDetails,
         startObservation,
-        startIndex,
         _startTime
       );
     }
 
     if (endObservation.timestamp != _endTime) {
       endObservation = _calculateTemporaryObservation(
-        _observations,
-        _accountDetails,
         endObservation,
-        endIndex,
         _endTime
       );
     }
@@ -312,35 +291,6 @@ library TwabLib {
     return
       (endObservation.cumulativeBalance - startObservation.cumulativeBalance) /
       (_endTime - _startTime);
-  }
-
-  /**
-   * @notice Retrieves a delegate balance for a specific observation record
-   * @param _observations The ring buffer of observations
-   * @param _accountDetails The account details
-   * @param _observation The observation whose delegate balance we want to determine
-   * @param _observationIndex The index of the observation in the ring buffer
-   * @return The delegate balance held at the time of the observation
-   */
-  function _getBalanceOf(
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
-    ObservationLib.Observation memory _observation,
-    uint32 _observationIndex
-  ) internal view returns (uint160) {
-    uint32 nextIndex = uint32(RingBufferLib.nextIndex(_observationIndex, MAX_CARDINALITY));
-    ObservationLib.Observation memory nextObservation = _observations[nextIndex];
-
-    // if there is no next observation, then they never held a balance previously.
-    if (nextObservation.timestamp == 0 || nextObservation.timestamp < _observation.timestamp) {
-      return _accountDetails.delegateBalance;
-    } else {
-      // compute the balance
-      // compute the balance using the twab in reverse
-      return
-        (nextObservation.cumulativeBalance - _observation.cumulativeBalance) /
-        (nextObservation.timestamp - _observation.timestamp);
-    }
   }
 
   /**
@@ -354,8 +304,8 @@ library TwabLib {
    * @return newAccountDetails The new account details
    */
   function _recordObservation(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     AccountDetails memory _accountDetails,
     Account storage _account
   )
@@ -366,7 +316,7 @@ library TwabLib {
       AccountDetails memory newAccountDetails
     )
   {
-    uint48 currentTime = uint48(block.timestamp);
+    uint32 currentTime = uint32(block.timestamp);
 
     uint16 nextIndex;
     ObservationLib.Observation memory newestObservation;
@@ -396,9 +346,9 @@ library TwabLib {
     observation = ObservationLib.Observation({
       cumulativeBalance: _extrapolateFromBalance(
         newestObservation,
-        _accountDetails.delegateBalance,
         currentTime
       ),
+      balance: _accountDetails.delegateBalance,
       timestamp: currentTime
     });
 
@@ -411,26 +361,16 @@ library TwabLib {
    * @notice Calculates a temporary observation for a given time using the previous observation.
    * @dev This is used to extrapolate a balance for any given time.
    * @param _observation The previous observation
-   * @param _observationIndex The index of the previous observation
    * @param _time The time to extrapolate to
-   * @return observation The observation
    */
   function _calculateTemporaryObservation(
-    ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
-    AccountDetails memory _accountDetails,
     ObservationLib.Observation memory _observation,
-    uint16 _observationIndex,
-    uint48 _time
+    uint32 _time
   ) private view returns (ObservationLib.Observation memory) {
-    uint160 balance = _getBalanceOf(
-      _observations,
-      _accountDetails,
-      _observation,
-      _observationIndex
-    );
     return
       ObservationLib.Observation({
-        cumulativeBalance: _extrapolateFromBalance(_observation, balance, _time),
+        cumulativeBalance: _extrapolateFromBalance(_observation, _time),
+        balance: _observation.balance,
         timestamp: _time
       });
   }
@@ -448,8 +388,8 @@ library TwabLib {
    * @return isNew Whether or not the observation is new
    */
   function _getNextObservationIndex(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails
   ) private view returns (uint16, ObservationLib.Observation memory, bool) {
@@ -483,10 +423,10 @@ library TwabLib {
    * @return The start time of the current overwrite period
    */
   function _currentOverwritePeriodStartedAt(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET
-  ) private view returns (uint48) {
-    uint48 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, uint48(block.timestamp));
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET
+  ) private view returns (uint32) {
+    uint32 period = getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, block.timestamp);
     return getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
   }
 
@@ -498,27 +438,10 @@ library TwabLib {
    */
   function _extrapolateFromBalance(
     ObservationLib.Observation memory _observation,
-    uint160 _balance,
-    uint48 _timestamp
-  ) private pure returns (uint160 cumulativeBalance) {
+    uint32 _timestamp
+  ) private pure returns (uint128 cumulativeBalance) {
     // new cumulative balance = provided cumulative balance (or zero) + (current balance * elapsed seconds)
-    return _observation.cumulativeBalance + _balance * (_timestamp - _observation.timestamp);
-  }
-
-  /**
-   * @notice Calculates the period a timestamp falls within.
-   * @dev All timestamps prior to the PERIOD_OFFSET fall within period 0.
-   * @param PERIOD_LENGTH The length of an overwrite period
-   * @param PERIOD_OFFSET The offset of the first period
-   * @param _timestamp The timestamp to calculate the period for
-   * @return period The period
-   */
-  function getTimestampPeriod(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
-    uint48 _timestamp
-  ) internal pure returns (uint48 period) {
-    return _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
+    return _observation.cumulativeBalance + uint128(_observation.balance) * (_timestamp - _observation.timestamp);
   }
 
   /**
@@ -528,9 +451,9 @@ library TwabLib {
    * @return The start time for the current overwrite period.
    */
   function currentOverwritePeriodStartedAt(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET
-  ) internal view returns (uint48) {
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET
+  ) internal view returns (uint32) {
     return _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
@@ -542,15 +465,15 @@ library TwabLib {
    * @param _timestamp The timestamp to calculate the period for
    * @return period The period
    */
-  function _getTimestampPeriod(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
-    uint48 _timestamp
-  ) private pure returns (uint48) {
+  function getTimestampPeriod(
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint256 _timestamp
+  ) internal pure returns (uint32) {
     if (_timestamp <= PERIOD_OFFSET) {
       return 0;
     }
-    return (_timestamp - PERIOD_OFFSET) / PERIOD_LENGTH;
+    return uint32((_timestamp - PERIOD_OFFSET) / uint256(PERIOD_LENGTH));
   }
 
   /**
@@ -561,10 +484,10 @@ library TwabLib {
    * @return _timestamp The timestamp at which the period starts
    */
   function getPeriodStartTime(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
-    uint48 _period
-  ) internal pure returns (uint48) {
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _period
+  ) internal pure returns (uint32) {
     return _period * PERIOD_LENGTH + PERIOD_OFFSET;
   }
 
@@ -576,10 +499,10 @@ library TwabLib {
    * @return _timestamp The timestamp at which the period ends
    */
   function getPeriodEndTime(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
-    uint48 _period
-  ) internal pure returns (uint48) {
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _period
+  ) internal pure returns (uint32) {
     return (_period + 1) * PERIOD_LENGTH + PERIOD_OFFSET;
   }
 
@@ -593,12 +516,12 @@ library TwabLib {
    * @return prevOrAtObservation The observation
    */
   function getPreviousOrAtObservation(
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
-    uint48 _targetTime
+    uint32 _targetTime
   ) internal view returns (ObservationLib.Observation memory prevOrAtObservation) {
-    (prevOrAtObservation, , ) = _getPreviousOrAtObservation(
+    prevOrAtObservation = _getPreviousOrAtObservation(
       PERIOD_OFFSET,
       _observations,
       _accountDetails,
@@ -612,27 +535,21 @@ library TwabLib {
    * @param _observations The circular buffer of observations
    * @param _accountDetails The account details to query with
    * @param _targetTime The timestamp to look up
-   * @return obs The observation
-   * @return index The index of the observation. If the obs is prior to history, this will be zero
-   * @return isBeforeHistory True if the observation is made up due to a lack of sufficient history
+   * @return prevOrAtObservation The observation
    */
   function _getPreviousOrAtObservation(
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails,
-    uint48 _targetTime
+    uint32 _targetTime
   )
     private
     view
-    returns (ObservationLib.Observation memory obs, uint16 index, bool isBeforeHistory)
+    returns (ObservationLib.Observation memory prevOrAtObservation)
   {
     // If there are no observations, return a zeroed observation
     if (_accountDetails.cardinality == 0) {
-      return (
-        ObservationLib.Observation({ cumulativeBalance: 0, timestamp: PERIOD_OFFSET }),
-        0,
-        true
-      );
+      return ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
     }
 
     (
@@ -644,11 +561,7 @@ library TwabLib {
     if (_targetTime < prevOrAtObservation.timestamp) {
       // if the user didn't have any activity prior to the oldest observation, then we know they had a zero balance
       if (_accountDetails.cardinality < MAX_CARDINALITY) {
-        return (
-          ObservationLib.Observation({ cumulativeBalance: 0, timestamp: _targetTime }),
-          0,
-          true
-        );
+        return ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: _targetTime });
       } else {
         // if we are missing their history, we must revert
         revert InsufficientHistory(_targetTime, prevOrAtObservation.timestamp);
@@ -657,7 +570,7 @@ library TwabLib {
 
     // We know targetTime >= oldestObservation.timestamp because of the above if statement, so we can return here.
     if (_accountDetails.cardinality == 1) {
-      return (prevOrAtObservation, oldestTwabIndex, false);
+      return prevOrAtObservation;
     }
 
     // Find the newest observation
@@ -665,13 +578,14 @@ library TwabLib {
       uint16 newestTwabIndex,
       ObservationLib.Observation memory afterOrAtObservation
     ) = getNewestObservation(_observations, _accountDetails);
+
     // if the target time is at or after the newest, return it
     if (_targetTime >= afterOrAtObservation.timestamp) {
-      return (afterOrAtObservation, newestTwabIndex, false);
+      return afterOrAtObservation;
     }
     // if we know there is only 1 observation older than the newest
     if (_accountDetails.cardinality == 2) {
-      return (prevOrAtObservation, oldestTwabIndex, false);
+      return prevOrAtObservation;
     }
 
     // Otherwise, we perform a binarySearch to find the observation before or at the timestamp
@@ -681,15 +595,16 @@ library TwabLib {
         newestTwabIndex,
         oldestTwabIndex,
         _targetTime,
-        _accountDetails.cardinality
+        _accountDetails.cardinality,
+        uint32(block.timestamp)
       );
 
     // If the afterOrAt is at, we can skip a temporary Observation computation by returning it here
     if (afterOrAtObservation.timestamp == _targetTime) {
-      return (afterOrAtObservation, newestTwabIndex, false);
+      return afterOrAtObservation;
     }
 
-    return (prevOrAtObservation, oldestTwabIndex, false);
+    return prevOrAtObservation;
   }
 
   /**
@@ -701,9 +616,9 @@ library TwabLib {
    * @return isSafe Whether or not the timestamp is safe
    */
   function hasFinalized(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
-    uint48 _time
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _time
   ) internal view returns (bool) {
     return _hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _time);
   }
@@ -717,9 +632,9 @@ library TwabLib {
    * @return isSafe Whether or not the timestamp is safe
    */
   function _hasFinalized(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
-    uint48 _time
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
+    uint32 _time
   ) private view returns (bool) {
     // It's safe if equal to the overwrite period start time, because the cumulative balance won't be impacted
     return _time <= _currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
@@ -732,12 +647,12 @@ library TwabLib {
    * @param _timestamp The timestamp to check
    */
   modifier requireFinalized(
-    uint48 PERIOD_LENGTH,
-    uint48 PERIOD_OFFSET,
+    uint32 PERIOD_LENGTH,
+    uint32 PERIOD_OFFSET,
     uint256 _timestamp
   ) {
     // The current period can still be changed; so the start of the period marks the beginning of unsafe timestamps.
-    uint48 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(
+    uint32 overwritePeriodStartTime = _currentOverwritePeriodStartedAt(
       PERIOD_LENGTH,
       PERIOD_OFFSET
     );

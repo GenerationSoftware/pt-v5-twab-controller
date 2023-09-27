@@ -52,6 +52,7 @@ contract TwabLibTest is BaseTest {
     assertEq(accountDetails.nextObservationIndex, 0);
     assertEq(accountDetails.cardinality, 0);
     assertEq(_observation.cumulativeBalance, 0);
+    assertEq(_observation.balance, 0);
     assertEq(_observation.timestamp, 0);
     assertFalse(_isNew);
     assertFalse(_isRecorded);

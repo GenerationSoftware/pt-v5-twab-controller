@@ -54,7 +54,7 @@ contract TwabLibMock {
     return (observation, isNewObservation, isObservationRecorded, accountDetails);
   }
 
-  function getTwabBetween(uint48 _startTime, uint48 _endTime) external view returns (uint256) {
+  function getTwabBetween(uint32 _startTime, uint32 _endTime) external view returns (uint256) {
     uint256 averageBalance = TwabLib.getTwabBetween(
       PERIOD_LENGTH,
       PERIOD_OFFSET,
@@ -67,7 +67,7 @@ contract TwabLibMock {
   }
 
   function getPreviousOrAtObservation(
-    uint48 _targetTime
+    uint32 _targetTime
   ) external view returns (ObservationLib.Observation memory) {
     ObservationLib.Observation memory prevOrAtObservation = TwabLib.getPreviousOrAtObservation(
       PERIOD_OFFSET,
@@ -102,7 +102,7 @@ contract TwabLibMock {
     return (index, observation);
   }
 
-  function getBalanceAt(uint48 _targetTime) external view returns (uint256) {
+  function getBalanceAt(uint32 _targetTime) external view returns (uint256) {
     uint256 balance = TwabLib.getBalanceAt(
       PERIOD_LENGTH,
       PERIOD_OFFSET,
@@ -121,30 +121,30 @@ contract TwabLibMock {
     return account.details;
   }
 
-  function getTimestampPeriod(uint48 _timestamp) external view returns (uint48) {
-    uint48 timestamp = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
+  function getTimestampPeriod(uint32 _timestamp) external view returns (uint32) {
+    uint32 timestamp = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
     return timestamp;
   }
 
-  function getPeriodStartTime(uint48 _period) external view returns (uint48) {
-    uint48 start = TwabLib.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
+  function getPeriodStartTime(uint32 _period) external view returns (uint32) {
+    uint32 start = TwabLib.getPeriodStartTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
     return start;
   }
 
-  function getPeriodEndTime(uint48 _period) external view returns (uint48) {
-    uint48 end = TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
+  function getPeriodEndTime(uint32 _period) external view returns (uint32) {
+    uint32 end = TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, _period);
     return end;
   }
 
   function currentOverwritePeriodStartedAt(
-    uint48 _PERIOD_LENGTH,
-    uint48 _PERIOD_OFFSET
-  ) external view returns (uint48) {
-    uint48 start = TwabLib.currentOverwritePeriodStartedAt(_PERIOD_LENGTH, _PERIOD_OFFSET);
+    uint32 _PERIOD_LENGTH,
+    uint32 _PERIOD_OFFSET
+  ) external view returns (uint32) {
+    uint32 start = TwabLib.currentOverwritePeriodStartedAt(_PERIOD_LENGTH, _PERIOD_OFFSET);
     return start;
   }
 
-  function hasFinalized(uint48 _timestamp) external view returns (bool) {
+  function hasFinalized(uint32 _timestamp) external view returns (bool) {
     bool isSafe = TwabLib.hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
     return isSafe;
   }

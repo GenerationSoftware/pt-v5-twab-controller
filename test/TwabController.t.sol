@@ -20,36 +20,36 @@ contract TwabControllerTest is BaseTest {
   event IncreasedBalance(
     address indexed vault,
     address indexed user,
-    uint112 amount,
-    uint112 delegateAmount
+    uint96 amount,
+    uint96 delegateAmount
   );
 
   event DecreasedBalance(
     address indexed vault,
     address indexed user,
-    uint112 amount,
-    uint112 delegateAmount
+    uint96 amount,
+    uint96 delegateAmount
   );
 
   event ObservationRecorded(
     address indexed vault,
     address indexed user,
-    uint112 balance,
-    uint112 delegateBalance,
+    uint96 balance,
+    uint96 delegateBalance,
     bool isNew,
     ObservationLib.Observation observation
   );
 
   event Delegated(address indexed vault, address indexed delegator, address indexed delegate);
 
-  event IncreasedTotalSupply(address indexed vault, uint112 amount, uint112 delegateAmount);
+  event IncreasedTotalSupply(address indexed vault, uint96 amount, uint96 delegateAmount);
 
-  event DecreasedTotalSupply(address indexed vault, uint112 amount, uint112 delegateAmount);
+  event DecreasedTotalSupply(address indexed vault, uint96 amount, uint96 delegateAmount);
 
   event TotalSupplyObservationRecorded(
     address indexed vault,
-    uint112 balance,
-    uint112 delegateBalance,
+    uint96 balance,
+    uint96 delegateBalance,
     bool isNew,
     ObservationLib.Observation observation
   );
@@ -300,6 +300,44 @@ contract TwabControllerTest is BaseTest {
     );
   }
 
+  /// It should not be possible for a twab measurement to change after the period has finalized.
+  function testGetTotalSupplyTwabBetween_regression() public {
+    uint32 secondPeriodStart = PERIOD_OFFSET + PERIOD_LENGTH;
+    vm.warp(secondPeriodStart);
+
+    twabController.mint(alice, 1000e18);
+
+    vm.warp(secondPeriodStart + PERIOD_LENGTH);
+
+    twabController.mint(alice, 1000e18);
+
+    vm.warp(secondPeriodStart + PERIOD_LENGTH * 2);
+
+    uint256 balance = twabController.getTotalSupplyTwabBetween(
+      address(this),
+      secondPeriodStart + PERIOD_LENGTH,
+      secondPeriodStart + PERIOD_LENGTH*2
+    );
+
+    assertGt(balance, 0);
+
+    vm.warp(secondPeriodStart + PERIOD_LENGTH * 2 + PERIOD_LENGTH/4);
+
+    twabController.mint(alice, 2222e18);
+
+    vm.warp(secondPeriodStart + PERIOD_LENGTH * 2 + PERIOD_LENGTH/2);
+
+    twabController.mint(bob, 44444e18);
+
+    vm.warp(secondPeriodStart + PERIOD_LENGTH * 3);
+
+    assertEq(balance, twabController.getTotalSupplyTwabBetween(
+      address(this),
+      secondPeriodStart + PERIOD_LENGTH,
+      secondPeriodStart + PERIOD_LENGTH*2
+    ), "mint after");
+  }
+
   function testGetTotalSupplyTwabBetween_noSnap() public {
     uint32 secondPeriodStart = PERIOD_OFFSET + PERIOD_LENGTH;
     vm.warp(secondPeriodStart);
@@ -538,7 +576,7 @@ contract TwabControllerTest is BaseTest {
       _amount,
       _amount,
       true,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: _amount, timestamp: uint32(block.timestamp) })
     );
 
     vm.expectEmit(true, false, false, true);
@@ -550,7 +588,7 @@ contract TwabControllerTest is BaseTest {
       _amount,
       _amount,
       true,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: _amount, timestamp: uint32(block.timestamp) })
     );
 
     vm.startPrank(mockVault);
@@ -572,8 +610,8 @@ contract TwabControllerTest is BaseTest {
     uint96 _amount = 1000e18;
     twabController.mint(alice, _amount);
 
-    vm.expectEmit(true, true, false, true);
-    emit DecreasedBalance(mockVault, alice, _amount, _amount);
+    // vm.expectEmit(true, true, false, true);
+    // emit DecreasedBalance(mockVault, alice, _amount, _amount);
 
     vm.expectEmit(true, false, false, true);
     emit ObservationRecorded(
@@ -582,7 +620,7 @@ contract TwabControllerTest is BaseTest {
       0,
       0,
       false,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: uint32(block.timestamp) })
     );
 
     vm.expectEmit(true, false, false, true);
@@ -594,15 +632,15 @@ contract TwabControllerTest is BaseTest {
       0,
       0,
       false,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: uint32(block.timestamp) })
     );
     twabController.burn(alice, _amount);
 
     TwabLib.Account memory account = twabController.getAccount(mockVault, alice);
     TwabLib.AccountDetails memory accountDetails = account.details;
 
-    assertEq(accountDetails.balance, 0);
-    assertEq(accountDetails.delegateBalance, 0);
+    assertEq(accountDetails.balance, 0, "account details balance matches");
+    assertEq(accountDetails.delegateBalance, 0, "account details delegate balance matches");
 
     vm.stopPrank();
   }
@@ -621,7 +659,7 @@ contract TwabControllerTest is BaseTest {
       _amount,
       _amount,
       true,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: _amount, timestamp: uint32(block.timestamp) })
     );
 
     vm.expectEmit(true, false, false, true);
@@ -633,7 +671,7 @@ contract TwabControllerTest is BaseTest {
       _amount,
       _amount,
       true,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: _amount, timestamp: uint32(block.timestamp) })
     );
     twabController.mint(alice, _amount);
 
@@ -647,7 +685,7 @@ contract TwabControllerTest is BaseTest {
       0,
       0,
       false,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: uint32(block.timestamp) })
     );
 
     vm.expectEmit(true, false, false, true);
@@ -659,7 +697,7 @@ contract TwabControllerTest is BaseTest {
       0,
       0,
       false,
-      ObservationLib.Observation({ cumulativeBalance: 0, timestamp: uint32(block.timestamp) })
+      ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: uint32(block.timestamp) })
     );
     twabController.burn(alice, _amount);
     vm.stopPrank();
