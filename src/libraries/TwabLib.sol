@@ -104,7 +104,7 @@ library TwabLib {
   {
     accountDetails = _account.details;
     // record a new observation if the delegateAmount is non-zero and time has not overflowed.
-    isObservationRecorded = _delegateAmount != uint96(0) && (block.timestamp - PERIOD_OFFSET) < type(uint32).max;
+    isObservationRecorded = _delegateAmount != uint96(0) && (block.timestamp - PERIOD_OFFSET) <= type(uint32).max;
 
     accountDetails.balance += _amount;
     accountDetails.delegateBalance += _delegateAmount;
@@ -165,7 +165,7 @@ library TwabLib {
     }
 
     // record a new observation if the delegateAmount is non-zero and time has not overflowed.
-    isObservationRecorded = _delegateAmount != uint96(0) && (block.timestamp - PERIOD_OFFSET) < type(uint32).max;
+    isObservationRecorded = _delegateAmount != uint96(0) && (block.timestamp - PERIOD_OFFSET) <= type(uint32).max;
 
     unchecked {
       accountDetails.balance -= _amount;

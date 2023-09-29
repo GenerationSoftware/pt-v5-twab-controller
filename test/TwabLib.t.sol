@@ -43,6 +43,24 @@ contract TwabLibTest is BaseTest {
 
   /* ============ increaseBalances ============ */
 
+  function testIncreaseBalance_endOfTimerange() public {
+    uint timestamp = PERIOD_OFFSET + uint(type(uint32).max);
+    vm.warp(timestamp);
+    twabLibMock.increaseBalances(1000e18, 1000e18);
+    vm.warp(uint(type(uint48).max));
+    assertEq(twabLibMock.getBalanceAt(timestamp), 1000e18);
+  }
+
+  function testDecreaseBalance_endOfTimerange() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.increaseBalances(1000e18, 1000e18);
+    uint timestamp = PERIOD_OFFSET + uint(type(uint32).max);
+    vm.warp(timestamp);
+    twabLibMock.decreaseBalances(100e18, 100e18, "revert message");
+    vm.warp(uint(type(uint48).max));
+    assertEq(twabLibMock.getBalanceAt(timestamp), 900e18);
+  }
+
   function testIncreaseBalanceHappyPath() public {
     uint96 _amount = 1000e18;
     uint32 _initialTimestamp = PERIOD_OFFSET + uint32(DRAW_LENGTH);
