@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.19;
 
-import { TwabLib, BalanceLTAmount, DelegateBalanceLTAmount, TimestampNotFinalized, InsufficientHistory } from "../src/libraries/TwabLib.sol";
+import { console2 } from "forge-std/console2.sol";
+
+import {
+  TwabLib,
+  BalanceLTAmount,
+  DelegateBalanceLTAmount,
+  TimestampNotFinalized,
+  InsufficientHistory,
+  InvalidTimeRange
+} from "../src/libraries/TwabLib.sol";
 import { ObservationLib, MAX_CARDINALITY } from "../src/libraries/ObservationLib.sol";
 
 import { BaseTest } from "./utils/BaseTest.sol";
@@ -81,7 +90,7 @@ contract TwabLibTest is BaseTest {
     assertEq(accountDetails.nextObservationIndex, 1);
     assertEq(accountDetails.cardinality, 1);
     assertEq(_observation.cumulativeBalance, 0);
-    assertEq(_observation.timestamp, _currentTimestamp);
+    assertEq(_observation.timestamp, _currentTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
     assertTrue(_isRecorded);
 
@@ -109,11 +118,11 @@ contract TwabLibTest is BaseTest {
 
     assertEq(accountDetails.balance, 0);
     assertEq(accountDetails.delegateBalance, _totalAmount);
-    assertEq(accountDetails.nextObservationIndex, 1);
-    assertEq(accountDetails.cardinality, 1);
+    assertEq(accountDetails.nextObservationIndex, 1, "next observation index");
+    assertEq(accountDetails.cardinality, 1, "cardinality");
     assertEq(_observation.cumulativeBalance, 0);
     assertTrue(_isRecorded);
-    assertEq(_observation.timestamp, _currentTimestamp);
+    assertEq(_observation.timestamp, _currentTimestamp - PERIOD_OFFSET);
     assertFalse(_isNew);
 
     vm.warp(_currentTimestamp + PERIOD_LENGTH);
@@ -140,7 +149,7 @@ contract TwabLibTest is BaseTest {
     assertEq(accountDetails.nextObservationIndex, 1);
     assertEq(accountDetails.cardinality, 1);
     assertEq(_observation1.cumulativeBalance, 0);
-    assertEq(_observation1.timestamp, _initialTimestamp);
+    assertEq(_observation1.timestamp, _initialTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
 
     vm.warp(_initialTimestamp + PERIOD_LENGTH);
@@ -164,11 +173,23 @@ contract TwabLibTest is BaseTest {
         _observation2.timestamp - _observation1.timestamp
       )
     );
-    assertEq(_observation2.timestamp, _secondTimestamp);
+    assertEq(_observation2.timestamp, _secondTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
 
     vm.warp(_secondTimestamp + PERIOD_LENGTH);
     assertEq(twabLibMock.getBalanceAt(_secondTimestamp), _totalAmount);
+  }
+
+  function testFlashIncreaseDecrease() public {
+    vm.warp(PERIOD_OFFSET);
+    twabLibMock.flashBalance(1000e18, 1000e18);
+    twabLibMock.flashBalance(1000e18, 1000e18);
+    TwabLib.AccountDetails memory details = twabLibMock.getAccountDetails();
+    assertEq(details.balance, 0);
+    assertEq(details.delegateBalance, 0);
+    assertEq(details.cardinality, 1);
+    vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);    
+    assertEq(twabLibMock.getTwabBetween(PERIOD_OFFSET, PERIOD_OFFSET + PERIOD_LENGTH), 0);
   }
 
   /* ============ decreaseBalances ============ */
@@ -231,7 +252,7 @@ contract TwabLibTest is BaseTest {
       _computeCumulativeBalance(0, _amount, DRAW_LENGTH),
       "cumulative balance remains the same"
     );
-    assertEq(_observation.timestamp, _secondTimestamp, "observation timestamp is correct");
+    assertEq(_observation.timestamp, _secondTimestamp - PERIOD_OFFSET, "observation timestamp is correct");
     assertTrue(_isNew, "was a new observation");
 
     assertEq(
@@ -264,7 +285,7 @@ contract TwabLibTest is BaseTest {
     assertEq(accountDetails.nextObservationIndex, 1);
     assertEq(accountDetails.cardinality, 1);
     assertEq(_observation.cumulativeBalance, 0);
-    assertEq(_observation.timestamp, _initialTimestamp);
+    assertEq(_observation.timestamp, _initialTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
 
     vm.warp(_secondTimestamp);
@@ -316,7 +337,7 @@ contract TwabLibTest is BaseTest {
     assertEq(accountDetails.nextObservationIndex, 1);
     assertEq(accountDetails.cardinality, 1);
     assertEq(_observation.cumulativeBalance, 0);
-    assertEq(_observation.timestamp, _initialTimestamp);
+    assertEq(_observation.timestamp, _initialTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
 
     vm.warp(_secondTimestamp);
@@ -332,7 +353,7 @@ contract TwabLibTest is BaseTest {
     assertEq(accountDetails.nextObservationIndex, 2);
     assertEq(accountDetails.cardinality, 2);
     assertEq(_observation2.cumulativeBalance, _computeCumulativeBalance(0, _amount, DRAW_LENGTH));
-    assertEq(_observation2.timestamp, _secondTimestamp);
+    assertEq(_observation2.timestamp, _secondTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
 
     vm.warp(_thirdTimestamp);
@@ -350,7 +371,7 @@ contract TwabLibTest is BaseTest {
       _observation.cumulativeBalance,
       _computeCumulativeBalance(_observation2.cumulativeBalance, _halfAmount, DRAW_LENGTH)
     );
-    assertEq(_observation.timestamp, _thirdTimestamp);
+    assertEq(_observation.timestamp, _thirdTimestamp - PERIOD_OFFSET);
     assertTrue(_isNew);
   }
 
@@ -399,7 +420,7 @@ contract TwabLibTest is BaseTest {
 
     assertEq(_oldestIndex, 0);
     assertEq(_oldestObservation.cumulativeBalance, 0);
-    assertEq(_oldestObservation.timestamp, _initialTimestamp);
+    assertEq(_oldestObservation.timestamp, _initialTimestamp - PERIOD_OFFSET);
     assertEq(_newestIndex, 2);
     assertEq(
       _newestObservation.cumulativeBalance,
@@ -409,7 +430,7 @@ contract TwabLibTest is BaseTest {
         _newestObservation.timestamp - _secondNewestObservation.timestamp
       )
     );
-    assertEq(_newestObservation.timestamp, _thirdTimestamp);
+    assertEq(_newestObservation.timestamp, _thirdTimestamp - PERIOD_OFFSET);
   }
 
   /* ============ getTwabBetween ============ */
@@ -424,6 +445,24 @@ contract TwabLibTest is BaseTest {
 
     vm.warp(initialTimestamp);
     twabLibMock.increaseBalances(0, amount);
+  }
+
+  function testGetTwabBetween_InvalidTimeRange() public {
+    vm.warp(PERIOD_OFFSET);
+    vm.expectRevert(abi.encodeWithSelector(InvalidTimeRange.selector, 1000, 100));
+    twabLibMock.getTwabBetween(1000, 100);
+  }
+
+  function testGetTwabBetween_startAfterTimerange() public {
+    vm.warp(2*uint(type(uint32).max));
+    uint256 startTime = PERIOD_OFFSET+uint(type(uint32).max)+1;
+    assertEq(twabLibMock.getTwabBetween(startTime, startTime + PERIOD_LENGTH), 0);
+  }
+
+  function testGetTwabBetween_endAfterTimerange() public {
+    vm.warp(2*uint(type(uint32).max));
+    uint256 startTime = PERIOD_OFFSET+uint(type(uint32).max);
+    assertEq(twabLibMock.getTwabBetween(startTime, startTime + PERIOD_LENGTH), 0);
   }
 
   function testGetTwabBetween_start_and_end_same_time() public {
@@ -679,13 +718,25 @@ contract TwabLibTest is BaseTest {
     assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET + PERIOD_LENGTH), 2e18);
   }
 
+  function testGetBalanceAt_endOfTimerange() public {
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(type(uint48).max);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET + uint(type(uint32).max)), 1e18);
+  }
+
+  function testGetBalanceAt_outOfTimerange() public {
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(type(uint48).max);
+    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET + uint(type(uint32).max) + 1), 0);
+  }
+
   function testGetBalanceAt_InsufficientHistory() public {
     fillObservationsBuffer();
     vm.expectRevert(
       abi.encodeWithSelector(
         InsufficientHistory.selector,
-        PERIOD_OFFSET,
-        PERIOD_OFFSET + PERIOD_LENGTH
+        0,
+        PERIOD_LENGTH
       )
     );
     twabLibMock.getBalanceAt(PERIOD_OFFSET);
@@ -817,24 +868,33 @@ contract TwabLibTest is BaseTest {
   function testGetPreviousOrAtObservation_single_before() public {
     uint32 t0 = PERIOD_OFFSET;
     twabLibMock.increaseBalances(0, 1e18);
-    assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1).timestamp, t0 - 1);
+    assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1).timestamp, 0);
   }
 
   function testGetPreviousOrAtObservation_single_at() public {
     uint32 t0 = PERIOD_OFFSET;
     twabLibMock.increaseBalances(0, 1e18);
     ObservationLib.Observation memory obs = twabLibMock.getPreviousOrAtObservation(t0);
-    assertEq(obs.timestamp, t0);
+    assertEq(obs.timestamp, 0);
   }
 
   function testGetPreviousOrAtObservation_single_after() public {
     uint32 t0 = PERIOD_OFFSET;
     twabLibMock.increaseBalances(0, 1e18);
     ObservationLib.Observation memory obs = twabLibMock.getPreviousOrAtObservation(t0 + 1);
-    assertEq(obs.timestamp, t0);
+    assertEq(obs.timestamp, 0);
   }
 
-  function testGetPreviousOrAtObservation() public {
+  function testGetPreviousOrAtObservation_after_lastTime() public {
+    twabLibMock.increaseBalances(0, 1e18);
+    vm.warp(PERIOD_OFFSET+uint256(type(uint32).max)+1);
+    ObservationLib.Observation memory obs = twabLibMock.getPreviousOrAtObservation(block.timestamp);
+    assertEq(obs.balance, 0);
+    assertEq(obs.cumulativeBalance, 0);
+    assertEq(obs.timestamp, type(uint32).max);
+  }
+
+  function testGetPreviousOrAtObservation_complex() public {
     uint32 t0 = PERIOD_OFFSET;
     uint32 t1 = PERIOD_OFFSET + PERIOD_LENGTH;
     uint32 t2 = PERIOD_OFFSET + (PERIOD_LENGTH * 2);
@@ -845,15 +905,15 @@ contract TwabLibTest is BaseTest {
     twabLibMock.increaseBalances(1, 1);
 
     // Get observation at timestamp before first observation
-    assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds).timestamp, t0 - 1);
+    assertEq(twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds).timestamp, 0);
 
     // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);
-    assertEq(prevOrAtObservation.timestamp, t0);
+    assertEq(prevOrAtObservation.timestamp, 0);
 
     // Get observation after first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 + 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t0);
+    assertEq(prevOrAtObservation.timestamp, 0);
 
     vm.warp(t1);
     twabLibMock.increaseBalances(1, 1);
@@ -864,47 +924,47 @@ contract TwabLibTest is BaseTest {
 
     // Get observation at timestamp before first observation
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0 - 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t0 - 1 seconds, "before first period");
+    assertEq(prevOrAtObservation.timestamp, 0, "before first period");
 
     // Get observation at first timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t0);
-    assertEq(prevOrAtObservation.timestamp, t0, "start of first period");
+    assertEq(prevOrAtObservation.timestamp, 0, "start of first period");
 
     // Get observation between first and second timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t1 - 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t0, "end of first period");
+    assertEq(prevOrAtObservation.timestamp, 0, "end of first period");
 
     // Get observation at second timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t1);
-    assertEq(prevOrAtObservation.timestamp, t1);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH);
 
     // Get observation between second and third timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t1 + 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t1);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH);
 
     // Get observation between second and third timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t2 - 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t1);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH);
 
     // Get observation at third timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t2);
-    assertEq(prevOrAtObservation.timestamp, t2);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH*2);
 
     // Get observation between third and fourth timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t2 + 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t2);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH*2);
 
     // Get observation between third and fourth timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t3 - 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t2);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH*2);
 
     // Get observation at fourth timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t3);
-    assertEq(prevOrAtObservation.timestamp, t3);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH*3);
 
     // Get observation after fourth timestamp
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t3 + 1 seconds);
-    assertEq(prevOrAtObservation.timestamp, t3);
+    assertEq(prevOrAtObservation.timestamp, PERIOD_LENGTH*3);
   }
 
   function testGetPreviousOrAtObservation_EmptyBuffer() public {
@@ -912,7 +972,7 @@ contract TwabLibTest is BaseTest {
       PERIOD_OFFSET
     );
 
-    assertEq(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertEq(prevOrAtObservation.timestamp, 0);
   }
 
   function testGetPreviousOrAtObservation_FullBuffer() public {
@@ -923,8 +983,8 @@ contract TwabLibTest is BaseTest {
     vm.expectRevert(
       abi.encodeWithSelector(
         InsufficientHistory.selector,
-        PERIOD_OFFSET,
-        PERIOD_OFFSET + PERIOD_LENGTH
+        0,
+        PERIOD_LENGTH
       )
     );
     twabLibMock.getPreviousOrAtObservation(PERIOD_OFFSET);
@@ -933,41 +993,41 @@ contract TwabLibTest is BaseTest {
     (, ObservationLib.Observation memory oldestObservation) = twabLibMock.getOldestObservation();
 
     // Get at oldest observation
-    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(oldestObservation.timestamp);
+    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(oldestObservation.timestamp + PERIOD_OFFSET);
     assertEq(prevOrAtObservation.timestamp, oldestObservation.timestamp);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertGe(prevOrAtObservation.timestamp, 0);
 
     // Get after oldest observation
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(
-      oldestObservation.timestamp + 1 seconds
+      oldestObservation.timestamp + 1 seconds + PERIOD_OFFSET
     );
     assertEq(prevOrAtObservation.timestamp, oldestObservation.timestamp);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertGe(prevOrAtObservation.timestamp, 0);
 
     // Get observation somewhere in the middle.
     uint32 t = PERIOD_OFFSET + (PERIOD_LENGTH * 100);
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t);
-    assertEq(prevOrAtObservation.timestamp, t);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertEq(prevOrAtObservation.timestamp, t - PERIOD_OFFSET);
+    assertGe(prevOrAtObservation.timestamp, 0);
 
     // Get observation right before somewhere in the middle.
     t -= 1 seconds;
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(t);
-    assertEq(prevOrAtObservation.timestamp, PERIOD_OFFSET + (PERIOD_LENGTH * 99));
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertEq(prevOrAtObservation.timestamp, (PERIOD_LENGTH * 99));
+    assertGe(prevOrAtObservation.timestamp, 0);
 
     // Get newest observation.
     (, ObservationLib.Observation memory newestObservation) = twabLibMock.getNewestObservation();
-    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(newestObservation.timestamp);
+    prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(newestObservation.timestamp + PERIOD_OFFSET);
     assertEq(prevOrAtObservation.timestamp, newestObservation.timestamp);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertGe(prevOrAtObservation.timestamp, 0);
 
     // Get before newest observation.
     prevOrAtObservation = twabLibMock.getPreviousOrAtObservation(
-      newestObservation.timestamp - 1 seconds
+      newestObservation.timestamp - 1 seconds + PERIOD_OFFSET
     );
     assertEq(prevOrAtObservation.timestamp, newestObservation.timestamp - PERIOD_LENGTH);
-    assertGe(prevOrAtObservation.timestamp, PERIOD_OFFSET);
+    assertGe(prevOrAtObservation.timestamp, 0);
   }
 
   // ================== getNextOrNewestObservation ==================

@@ -1,4 +1,4 @@
-name: 90% Test Coverage
+name: 100% Test Coverage
 
 on: ["push", "pull_request"]
 
@@ -43,12 +43,12 @@ jobs:
         env:
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
         run: |
-          forge coverage --report lcov && lcov --extract lcov.info -o lcov.info 'src/*'
+          forge coverage --nmc Invariant --report lcov && lcov --extract lcov.info -o lcov.info 'src/*'
         id: coverage
 
       - name: Report code coverage
         uses: zgosalvez/github-actions-report-lcov@v1.5.0
         with:
           coverage-files: lcov.info
-          minimum-coverage: 90
+          minimum-coverage: 100
           github-token: ${{ secrets.GITHUB_TOKEN }}

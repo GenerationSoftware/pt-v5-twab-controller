@@ -43,7 +43,6 @@ contract ObservationLibMock {
    * @param _oldestObservationIndex Index of the oldest Observation. Left side of the circular buffer.
    * @param _target Timestamp at which we are searching the Observation.
    * @param _cardinality Cardinality of the circular buffer we are searching through.
-   * @param _currentTime Current time
    * @return Observation recorded before, or at, the target.
    * @return Observation recorded at, or after, the target.
    */
@@ -51,8 +50,7 @@ contract ObservationLibMock {
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
     uint32 _target,
-    uint16 _cardinality,
-    uint32 _currentTime
+    uint16 _cardinality
   )
     external
     view
@@ -68,8 +66,7 @@ contract ObservationLibMock {
         _newestObservationIndex,
         _oldestObservationIndex,
         _target,
-        _cardinality,
-        _currentTime
+        _cardinality
       );
     return (beforeOrAt, beforeOrAtIndex, afterOrAt, afterOrAtIndex);
   }

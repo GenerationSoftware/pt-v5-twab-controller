@@ -41,8 +41,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         2,
-        cardinality,
-        time
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 1);
@@ -53,44 +52,11 @@ contract ObservationLibTest is BaseTest {
       newestObservationIndex,
       oldestObservationIndex,
       5,
-      cardinality,
-      time
+      cardinality
     );
 
     assertEq(beforeOrAt.timestamp, 5);
     assertEq(afterOrAt.timestamp, 6);
-  }
-
-  function testBinarySearch_beforeOrAtIsZero() public {
-    observationLibMock.updateObservation(
-      2,
-      ObservationLib.Observation({ timestamp: 10, balance: 0, cumulativeBalance: 0 })
-    );
-    observationLibMock.updateObservation(
-      3,
-      ObservationLib.Observation({ timestamp: 20, balance: 0, cumulativeBalance: 0 })
-    );
-
-    uint24 newestObservationIndex = 3;
-    uint24 oldestObservationIndex = 0;
-    uint32 target = 10;
-    uint16 cardinality = 4;
-
-    (
-      ObservationLib.Observation memory beforeOrAt,
-      uint16 beforeOrAtIndex,
-      ObservationLib.Observation memory afterOrAt,
-      uint16 afterOrAtIndex
-    ) = observationLibMock.binarySearch(
-        newestObservationIndex,
-        oldestObservationIndex,
-        target,
-        cardinality,
-        uint32(block.timestamp)
-      );
-
-    assertEq(beforeOrAt.timestamp, target);
-    assertEq(afterOrAt.timestamp, 20);
   }
 
   function testBinarySearch_HappyPath_afterOrAt() public {
@@ -116,8 +82,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, target - 1);
@@ -138,8 +103,7 @@ contract ObservationLibTest is BaseTest {
       newestObservationIndex,
       oldestObservationIndex,
       target,
-      cardinality,
-      uint32(block.timestamp)
+      cardinality
     );
   }
 
@@ -161,8 +125,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 10);
@@ -183,8 +146,7 @@ contract ObservationLibTest is BaseTest {
       newestObservationIndex,
       oldestObservationIndex,
       target,
-      cardinality,
-      uint32(block.timestamp)
+      cardinality
     );
   }
 
@@ -207,8 +169,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 10);
@@ -234,8 +195,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 10);
@@ -261,8 +221,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 10);
@@ -289,8 +248,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 10);
@@ -317,8 +275,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 20);
@@ -345,8 +302,7 @@ contract ObservationLibTest is BaseTest {
         newestObservationIndex,
         oldestObservationIndex,
         target,
-        cardinality,
-        uint32(block.timestamp)
+        cardinality
       );
 
     assertEq(beforeOrAt.timestamp, 20);

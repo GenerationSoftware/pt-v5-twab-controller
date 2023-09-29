@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 
 import "ring-buffer-lib/RingBufferLib.sol";
 
-import "./OverflowSafeComparatorLib.sol";
+// import "./OverflowSafeComparatorLib.sol";
 
 /**
  * @dev Sets max ring buffer length in the Account.observations Observation list.
@@ -22,8 +22,6 @@ uint16 constant MAX_CARDINALITY = 9600; // with min period of 1 hour, this allow
  * @author PoolTogether Inc.
  */
 library ObservationLib {
-  using OverflowSafeComparatorLib for uint32;
-
   /**
    * @notice Observation, which includes an amount and timestamp.
    * @param cumulativeBalance the cumulative time-weighted balance at `timestamp`.
@@ -48,7 +46,6 @@ library ObservationLib {
    * @param _oldestObservationIndex Index of the oldest Observation. Left side of the circular buffer.
    * @param _target Timestamp at which we are searching the Observation.
    * @param _cardinality Cardinality of the circular buffer we are searching through.
-   * @param _currentTime Current timestamp.
    * @return beforeOrAt Observation recorded before, or at, the target.
    * @return beforeOrAtIndex Index of observation recorded before, or at, the target.
    * @return afterOrAt Observation recorded at, or after, the target.
@@ -59,8 +56,7 @@ library ObservationLib {
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
     uint32 _target,
-    uint16 _cardinality,
-    uint32 _currentTime
+    uint16 _cardinality
   )
     internal
     view
@@ -86,19 +82,13 @@ library ObservationLib {
       beforeOrAt = _observations[beforeOrAtIndex];
       uint32 beforeOrAtTimestamp = beforeOrAt.timestamp;
 
-      // We've landed on an uninitialized timestamp, keep searching higher (more recently).
-      if (beforeOrAtTimestamp == 0) {
-        leftSide = uint16(RingBufferLib.nextIndex(leftSide, _cardinality));
-        continue;
-      }
-
       afterOrAtIndex = uint16(RingBufferLib.nextIndex(currentIndex, _cardinality));
       afterOrAt = _observations[afterOrAtIndex];
 
-      bool targetAfterOrAt = beforeOrAtTimestamp.lte(_target, _currentTime);
+      bool targetAfterOrAt = beforeOrAtTimestamp <= _target;
 
       // Check if we've found the corresponding Observation.
-      if (targetAfterOrAt && _target.lte(afterOrAt.timestamp, _currentTime)) {
+      if (targetAfterOrAt && _target <= afterOrAt.timestamp) {
         break;
       }
 

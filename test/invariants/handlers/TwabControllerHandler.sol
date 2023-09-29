@@ -279,7 +279,7 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
         }
 
         // Check if each period end timestamp is safe for this vault
-        uint32 newestPeriod = twabController.getTimestampPeriod(newestObservation.timestamp);
+        uint256 newestPeriod = twabController.getTimestampPeriod(newestObservation.timestamp);
         for (uint32 p_i = 1; p_i < newestPeriod; ++p_i) {
           uint32 timestamp = PERIOD_OFFSET + (p_i * PERIOD_LENGTH);
           isVaultsSafe = isVaultsSafe && twabController.hasFinalized(timestamp);

@@ -254,7 +254,7 @@ contract TwabController {
   function getBalanceAt(
     address vault,
     address user,
-    uint32 periodEndOnOrAfterTime
+    uint256 periodEndOnOrAfterTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
     return
@@ -275,7 +275,7 @@ contract TwabController {
    */
   function getTotalSupplyAt(
     address vault,
-    uint32 periodEndOnOrAfterTime
+    uint256 periodEndOnOrAfterTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
     return
@@ -300,8 +300,8 @@ contract TwabController {
   function getTwabBetween(
     address vault,
     address user,
-    uint32 startTime,
-    uint32 endTime
+    uint256 startTime,
+    uint256 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = userObservations[vault][user];
     // We snap the timestamps to the period end on or after the timestamp because the total supply records will be sparsely populated.
@@ -327,8 +327,8 @@ contract TwabController {
    */
   function getTotalSupplyTwabBetween(
     address vault,
-    uint32 startTime,
-    uint32 endTime
+    uint256 startTime,
+    uint256 endTime
   ) external view returns (uint256) {
     TwabLib.Account storage _account = totalSupplyObservations[vault];
     // We snap the timestamps to the period end on or after the timestamp because the total supply records will be sparsely populated.
@@ -349,7 +349,7 @@ contract TwabController {
    * @param _timestamp The timestamp to check
    * @return The end timestamp of the period that ends on or immediately after the given timestamp
    */
-  function periodEndOnOrAfter(uint32 _timestamp) external view returns (uint32) {
+  function periodEndOnOrAfter(uint256 _timestamp) external view returns (uint256) {
     return _periodEndOnOrAfter(_timestamp);
   }
 
@@ -358,18 +358,19 @@ contract TwabController {
    * @param _timestamp The timestamp to compute the period end time for
    * @return A period end time.
    */
-  function _periodEndOnOrAfter(uint32 _timestamp) internal view returns (uint32) {
+  function _periodEndOnOrAfter(uint256 _timestamp) internal view returns (uint256) {
     if (_timestamp < PERIOD_OFFSET) {
       return PERIOD_OFFSET;
     }
     if ((_timestamp - PERIOD_OFFSET) % PERIOD_LENGTH == 0) {
-      return _timestamp;
+      return uint32(_timestamp);
     }
+    uint256 period = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
     return
       TwabLib.getPeriodEndTime(
         PERIOD_LENGTH,
         PERIOD_OFFSET,
-        TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp)
+        period
       );
   }
 
@@ -434,7 +435,7 @@ contract TwabController {
    * @param time The timestamp to check
    * @return period The period the timestamp falls into
    */
-  function getTimestampPeriod(uint32 time) external view returns (uint32) {
+  function getTimestampPeriod(uint256 time) external view returns (uint256) {
     return TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, time);
   }
 
@@ -443,7 +444,7 @@ contract TwabController {
    * @param time The timestamp to check
    * @return True if the given time is finalized, false if it's during the current overwrite period.
    */
-  function hasFinalized(uint32 time) external view returns (bool) {
+  function hasFinalized(uint256 time) external view returns (bool) {
     return TwabLib.hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, time);
   }
 
@@ -452,7 +453,7 @@ contract TwabController {
    * @dev The overwrite period is the period during which observations are collated.
    * @return period The timestamp at which the current overwrite period started.
    */
-  function currentOverwritePeriodStartedAt() external view returns (uint32) {
+  function currentOverwritePeriodStartedAt() external view returns (uint256) {
     return TwabLib.currentOverwritePeriodStartedAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
