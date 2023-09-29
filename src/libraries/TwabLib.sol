@@ -385,7 +385,7 @@ library TwabLib {
   function _calculateTemporaryObservation(
     ObservationLib.Observation memory _observation,
     PeriodOffsetRelativeTimestamp _time
-  ) private view returns (ObservationLib.Observation memory) {
+  ) private pure returns (ObservationLib.Observation memory) {
     return
       ObservationLib.Observation({
         cumulativeBalance: _extrapolateFromBalance(_observation, _time),
@@ -411,23 +411,24 @@ library TwabLib {
     uint32 PERIOD_OFFSET,
     ObservationLib.Observation[MAX_CARDINALITY] storage _observations,
     AccountDetails memory _accountDetails
-  ) private view returns (uint16, ObservationLib.Observation memory, bool) {
-    (
-      uint16 newestIndex,
-      ObservationLib.Observation memory newestObservation
-    ) = getNewestObservation(_observations, _accountDetails);
+  ) private view returns (uint16 index, ObservationLib.Observation memory newestObservation, bool isNew) {
+    uint16 newestIndex;
+    (newestIndex, newestObservation) = getNewestObservation(_observations, _accountDetails);
 
-    // if we're in the same block, return
-    if (newestObservation.timestamp == block.timestamp) {
-      return (newestIndex, newestObservation, false);
-    }
+    uint256 currentPeriod = getTimestampPeriod(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      block.timestamp
+    );
+
+    uint256 newestObservationPeriod = getTimestampPeriod(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      PERIOD_OFFSET + uint256(newestObservation.timestamp)
+    );
 
     // Create a new Observation if it's the first period or the current time falls within a new period
-    if (
-      _accountDetails.cardinality == 0 ||
-      _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, uint48(block.timestamp)) >
-      _getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, newestObservation.timestamp)
-    ) {
+    if (_accountDetails.cardinality == 0 || currentPeriod > newestObservationPeriod) {
       return (_accountDetails.nextObservationIndex, newestObservation, true);
     }
 
@@ -458,7 +459,7 @@ library TwabLib {
   function _extrapolateFromBalance(
     ObservationLib.Observation memory _observation,
     PeriodOffsetRelativeTimestamp _offsetTimestamp
-  ) private view returns (uint128) {
+  ) private pure returns (uint128) {
     // new cumulative balance = provided cumulative balance (or zero) + (current balance * elapsed seconds)
     uint128 cumulativeBalance;
     uint32 deltaTime = PeriodOffsetRelativeTimestamp.unwrap(_offsetTimestamp) - _observation.timestamp;
@@ -585,10 +586,9 @@ library TwabLib {
       return ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: 0 });
     }
 
-    (
-      uint16 oldestTwabIndex,
-      ObservationLib.Observation memory prevOrAtObservation
-    ) = getOldestObservation(_observations, _accountDetails);
+    uint16 oldestTwabIndex;
+
+    (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
 
     // if the requested time is older than the oldest observation
     if (PeriodOffsetRelativeTimestamp.unwrap(_offsetTargetTime) < prevOrAtObservation.timestamp) {
