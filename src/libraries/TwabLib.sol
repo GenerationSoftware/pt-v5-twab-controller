@@ -72,7 +72,7 @@ library TwabLib {
    */
   struct Account {
     AccountDetails details;
-    ObservationLib.Observation[9600] observations;
+    ObservationLib.Observation[17520] observations;
   }
 
   /**

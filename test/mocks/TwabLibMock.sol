@@ -6,7 +6,7 @@ import { TwabLib } from "../../src/libraries/TwabLib.sol";
 import { ObservationLib } from "../../src/libraries/ObservationLib.sol";
 
 contract TwabLibMock {
-  uint16 public constant MAX_CARDINALITY = 9600;
+  uint16 public constant MAX_CARDINALITY = 17520;
   uint32 PERIOD_LENGTH = 1 days;
   uint32 PERIOD_OFFSET = 10 days;
   using TwabLib for ObservationLib.Observation[MAX_CARDINALITY];

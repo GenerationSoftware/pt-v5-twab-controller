@@ -11,7 +11,7 @@ import "ring-buffer-lib/RingBufferLib.sol";
  * @dev The user Account.Account.cardinality parameter can NOT exceed the max cardinality variable.
  *      Preventing "corrupted" ring buffer lookup pointers and new observation checkpoints.
  */
-uint16 constant MAX_CARDINALITY = 9600; // with min period of 1 hour, this allows for minimum 400 days of history
+uint16 constant MAX_CARDINALITY = 17520; // with min period of 1 hour, this allows for minimum two years of history
 
 /**
  * @title Observation Library
