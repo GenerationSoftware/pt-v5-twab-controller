@@ -4,8 +4,6 @@ pragma solidity ^0.8.19;
 
 import "ring-buffer-lib/RingBufferLib.sol";
 
-// import "./OverflowSafeComparatorLib.sol";
-
 /**
  * @dev Sets max ring buffer length in the Account.observations Observation list.
  *         As users transfer/mint/burn tickets new Observation checkpoints are recorded.

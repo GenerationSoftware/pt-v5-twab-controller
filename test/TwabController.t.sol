@@ -339,7 +339,7 @@ contract TwabControllerTest is BaseTest {
       secondPeriodStart + PERIOD_LENGTH*2
     );
 
-    assertGt(balance, 0);
+    assertEq(balance, 2000e18);
 
     vm.warp(secondPeriodStart + PERIOD_LENGTH * 2 + PERIOD_LENGTH/4);
 
@@ -647,8 +647,8 @@ contract TwabControllerTest is BaseTest {
     uint96 _amount = 1000e18;
     twabController.mint(alice, _amount);
 
-    // vm.expectEmit(true, true, false, true);
-    // emit DecreasedBalance(mockVault, alice, _amount, _amount);
+    vm.expectEmit(true, true, false, true);
+    emit DecreasedBalance(mockVault, alice, _amount, _amount);
 
     vm.expectEmit(true, false, false, true);
     emit ObservationRecorded(
