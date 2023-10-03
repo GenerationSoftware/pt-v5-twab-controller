@@ -18,7 +18,7 @@ contract ObservationLibTest is BaseTest {
   /* ============ binarySearch ============ */
 
   function testBinarySearch_HappyPath_beforeOrAt() public {
-    uint48[] memory t = new uint48[](6);
+    uint32[] memory t = new uint32[](6);
     t[0] = 1;
     t[1] = 2;
     t[2] = 3;
@@ -29,6 +29,7 @@ contract ObservationLibTest is BaseTest {
     uint24 newestObservationIndex = 5;
     uint24 oldestObservationIndex = 0;
     uint16 cardinality = uint16(t.length);
+    uint32 time = 100;
 
     // Left side
     (
@@ -58,39 +59,8 @@ contract ObservationLibTest is BaseTest {
     assertEq(afterOrAt.timestamp, 6);
   }
 
-  function testBinarySearch_beforeOrAtIsZero() public {
-    observationLibMock.updateObservation(
-      2,
-      ObservationLib.Observation({ timestamp: 10, cumulativeBalance: 0 })
-    );
-    observationLibMock.updateObservation(
-      3,
-      ObservationLib.Observation({ timestamp: 20, cumulativeBalance: 0 })
-    );
-
-    uint24 newestObservationIndex = 3;
-    uint24 oldestObservationIndex = 0;
-    uint48 target = 10;
-    uint16 cardinality = 4;
-
-    (
-      ObservationLib.Observation memory beforeOrAt,
-      uint16 beforeOrAtIndex,
-      ObservationLib.Observation memory afterOrAt,
-      uint16 afterOrAtIndex
-    ) = observationLibMock.binarySearch(
-        newestObservationIndex,
-        oldestObservationIndex,
-        target,
-        cardinality
-      );
-
-    assertEq(beforeOrAt.timestamp, target);
-    assertEq(afterOrAt.timestamp, 20);
-  }
-
   function testBinarySearch_HappyPath_afterOrAt() public {
-    uint48[] memory t = new uint48[](6);
+    uint32[] memory t = new uint32[](6);
     t[0] = 1;
     t[1] = 2;
     t[2] = 3;
@@ -100,7 +70,7 @@ contract ObservationLibTest is BaseTest {
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 5;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 4;
+    uint32 target = 4;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -121,12 +91,12 @@ contract ObservationLibTest is BaseTest {
 
   // Outside of range
   function testFailBinarySearch_OneItem_TargetBefore() public {
-    uint48[] memory t = new uint48[](1);
+    uint32[] memory t = new uint32[](1);
     t[0] = 10;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 0;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 5;
+    uint32 target = 5;
     uint16 cardinality = uint16(t.length);
 
     observationLibMock.binarySearch(
@@ -138,12 +108,12 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_OneItem_TargetExact() public {
-    uint48[] memory t = new uint48[](1);
+    uint32[] memory t = new uint32[](1);
     t[0] = 10;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 0;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 10;
+    uint32 target = 10;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -164,12 +134,12 @@ contract ObservationLibTest is BaseTest {
 
   // Outside of range
   function testFailBinarySearch_OneItem_TargetAfter() public {
-    uint48[] memory t = new uint48[](1);
+    uint32[] memory t = new uint32[](1);
     t[0] = 10;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 0;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 15;
+    uint32 target = 15;
     uint16 cardinality = uint16(t.length);
 
     observationLibMock.binarySearch(
@@ -181,13 +151,13 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_TwoItems_TargetStart() public {
-    uint48[] memory t = new uint48[](2);
+    uint32[] memory t = new uint32[](2);
     t[0] = 10;
     t[1] = 20;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 1;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 10;
+    uint32 target = 10;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -207,13 +177,13 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_TwoItems_TargetBetween() public {
-    uint48[] memory t = new uint48[](2);
+    uint32[] memory t = new uint32[](2);
     t[0] = 10;
     t[1] = 20;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 1;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 15;
+    uint32 target = 15;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -233,13 +203,13 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_TwoItems_TargetEnd() public {
-    uint48[] memory t = new uint48[](2);
+    uint32[] memory t = new uint32[](2);
     t[0] = 10;
     t[1] = 20;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 1;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 20;
+    uint32 target = 20;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -259,14 +229,14 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_ThreeItems_TargetStart() public {
-    uint48[] memory t = new uint48[](3);
+    uint32[] memory t = new uint32[](3);
     t[0] = 10;
     t[1] = 20;
     t[2] = 30;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 2;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 10;
+    uint32 target = 10;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -286,14 +256,14 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_ThreeItems_TargetBetween() public {
-    uint48[] memory t = new uint48[](3);
+    uint32[] memory t = new uint32[](3);
     t[0] = 10;
     t[1] = 20;
     t[2] = 30;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 2;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 20;
+    uint32 target = 20;
     uint16 cardinality = uint16(t.length);
 
     (
@@ -313,14 +283,14 @@ contract ObservationLibTest is BaseTest {
   }
 
   function testBinarySearch_ThreeItems_TargetEnd() public {
-    uint48[] memory t = new uint48[](3);
+    uint32[] memory t = new uint32[](3);
     t[0] = 10;
     t[1] = 20;
     t[2] = 30;
     observationLibMock.populateObservations(t);
     uint24 newestObservationIndex = 2;
     uint24 oldestObservationIndex = 0;
-    uint48 target = 30;
+    uint32 target = 30;
     uint16 cardinality = uint16(t.length);
 
     (

@@ -11,7 +11,7 @@ import "ring-buffer-lib/RingBufferLib.sol";
  * @dev The user Account.Account.cardinality parameter can NOT exceed the max cardinality variable.
  *      Preventing "corrupted" ring buffer lookup pointers and new observation checkpoints.
  */
-uint16 constant MAX_CARDINALITY = 9600; // with min period of 1 hour, this allows for minimum 400 days of history
+uint16 constant MAX_CARDINALITY = 17520; // with min period of 1 hour, this allows for minimum two years of history
 
 /**
  * @title Observation Library
@@ -22,13 +22,14 @@ uint16 constant MAX_CARDINALITY = 9600; // with min period of 1 hour, this allow
 library ObservationLib {
   /**
    * @notice Observation, which includes an amount and timestamp.
-   * @param balance `balance` at `timestamp`.
    * @param cumulativeBalance the cumulative time-weighted balance at `timestamp`.
+   * @param balance `balance` at `timestamp`.
    * @param timestamp Recorded `timestamp`.
    */
   struct Observation {
-    uint160 cumulativeBalance;
-    uint48 timestamp;
+    uint128 cumulativeBalance;
+    uint96 balance;
+    uint32 timestamp;
   }
 
   /**
@@ -52,7 +53,7 @@ library ObservationLib {
     Observation[MAX_CARDINALITY] storage _observations,
     uint24 _newestObservationIndex,
     uint24 _oldestObservationIndex,
-    uint48 _target,
+    uint32 _target,
     uint16 _cardinality
   )
     internal
@@ -77,13 +78,7 @@ library ObservationLib {
 
       beforeOrAtIndex = uint16(RingBufferLib.wrap(currentIndex, _cardinality));
       beforeOrAt = _observations[beforeOrAtIndex];
-      uint48 beforeOrAtTimestamp = beforeOrAt.timestamp;
-
-      // We've landed on an uninitialized timestamp, keep searching higher (more recently).
-      if (beforeOrAtTimestamp == 0) {
-        leftSide = uint16(RingBufferLib.nextIndex(leftSide, _cardinality));
-        continue;
-      }
+      uint32 beforeOrAtTimestamp = beforeOrAt.timestamp;
 
       afterOrAtIndex = uint16(RingBufferLib.nextIndex(currentIndex, _cardinality));
       afterOrAt = _observations[afterOrAtIndex];
