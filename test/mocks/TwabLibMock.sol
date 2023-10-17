@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.19;
 
@@ -12,12 +12,16 @@ contract TwabLibMock {
   using TwabLib for ObservationLib.Observation[MAX_CARDINALITY];
   TwabLib.Account public account;
 
-  function flashBalance(
-    uint96 _amount,
-    uint96 _delegateAmount
-  ) external {
+  function flashBalance(uint96 _amount, uint96 _delegateAmount) external {
     TwabLib.increaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, account, _amount, _delegateAmount);
-    TwabLib.decreaseBalances(PERIOD_LENGTH, PERIOD_OFFSET, account, _amount, _delegateAmount, "decrease");
+    TwabLib.decreaseBalances(
+      PERIOD_LENGTH,
+      PERIOD_OFFSET,
+      account,
+      _amount,
+      _delegateAmount,
+      "decrease"
+    );
   }
 
   function increaseBalances(

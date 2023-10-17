@@ -28,8 +28,8 @@ uint32 constant MINIMUM_PERIOD_LENGTH = 1 hours;
 address constant SPONSORSHIP_ADDRESS = address(1);
 
 /**
- * @title  Time-Weighted Average Balance Controller
- * @author PoolTogether Inc.
+ * @title  PoolTogether V5 Time-Weighted Average Balance Controller
+ * @author PoolTogether Inc. & G9 Software Inc.
  * @dev    Time-Weighted Average Balance Controller for ERC20 tokens.
  * @notice This TwabController uses the TwabLib to provide token balances and on-chain historical
             lookups to a user(s) time-weighted average balance. Each user is mapped to an
@@ -366,12 +366,7 @@ contract TwabController {
       return _timestamp;
     }
     uint256 period = TwabLib.getTimestampPeriod(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
-    return
-      TwabLib.getPeriodEndTime(
-        PERIOD_LENGTH,
-        PERIOD_OFFSET,
-        period
-      );
+    return TwabLib.getPeriodEndTime(PERIOD_LENGTH, PERIOD_OFFSET, period);
   }
 
   /**
