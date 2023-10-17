@@ -1,14 +1,14 @@
 {
-  "name": "@pooltogether/foundry-template",
+  "name": "@generationsoftware/pt-v5-twab-controller",
   "version": "1.0.0",
-  "description": "Template to kickstart a Foundry project",
+  "description": "PoolTogether V5 TWAB Controller contracts",
   "author": {
-    "name": "PoolTogether Inc.",
-    "url": "https://github.com/pooltogether"
+    "name": "G9 Software Inc.",
+    "url": "https://github.com/generationsoftware"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pooltogether/foundry-template.git"
+    "url": "git+https://github.com/generationsoftware/pt-v5-twab-controller.git"
   },
   "scripts": {
     "clean": "forge clean",
@@ -25,7 +25,7 @@
   "devDependencies": {
     "husky": "8.0.3",
     "lint-staged": "14.0.1",
-    "prettier": "3.0.3",
+    "prettier": "2.8.8",
     "prettier-plugin-solidity": "1.1.3",
     "solhint": "3.6.2",
     "solhint-plugin-prettier": "0.0.5"

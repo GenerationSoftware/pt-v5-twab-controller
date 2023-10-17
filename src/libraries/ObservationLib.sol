@@ -14,10 +14,10 @@ import "ring-buffer-lib/RingBufferLib.sol";
 uint16 constant MAX_CARDINALITY = 17520; // with min period of 1 hour, this allows for minimum two years of history
 
 /**
- * @title Observation Library
+ * @title PoolTogether V5 Observation Library
+ * @author PoolTogether Inc. & G9 Software Inc.
  * @notice This library allows one to store an array of timestamped values and efficiently search them.
  * @dev Largely pulled from Uniswap V3 Oracle.sol: https://github.com/Uniswap/v3-core/blob/c05a0e2c8c08c460fb4d05cfdda30b3ad8deeaac/contracts/libraries/Oracle.sol
- * @author PoolTogether Inc.
  */
 library ObservationLib {
   /**
