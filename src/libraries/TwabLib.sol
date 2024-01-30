@@ -310,13 +310,13 @@ library TwabLib {
       revert InvalidTimeRange(_startTime, _endTime);
     }
 
-    uint256 offsetStartTime = _startTime - PERIOD_OFFSET;
-    uint256 offsetEndTime = _endTime - PERIOD_OFFSET;
-
     // if the range extends into the shutdown period, return 0
     if (isShutdownAt(_endTime, PERIOD_OFFSET)) {
       return 0;
     }
+
+    uint256 offsetStartTime = _startTime - PERIOD_OFFSET;
+    uint256 offsetEndTime = _endTime - PERIOD_OFFSET;
 
     ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
       _observations,
