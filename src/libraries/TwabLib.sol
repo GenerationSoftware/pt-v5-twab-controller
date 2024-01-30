@@ -109,7 +109,7 @@ library TwabLib {
     // record a new observation if the delegateAmount is non-zero and time has not overflowed.
     isObservationRecorded =
       _delegateAmount != uint96(0) &&
-      (block.timestamp - PERIOD_OFFSET) <= type(uint32).max;
+      block.timestamp <= lastObservationAt(PERIOD_OFFSET);
 
     accountDetails.balance += _amount;
     accountDetails.delegateBalance += _delegateAmount;
@@ -172,7 +172,7 @@ library TwabLib {
     // record a new observation if the delegateAmount is non-zero and time has not overflowed.
     isObservationRecorded =
       _delegateAmount != uint96(0) &&
-      (block.timestamp - PERIOD_OFFSET) <= type(uint32).max;
+      block.timestamp <= lastObservationAt(PERIOD_OFFSET);
 
     unchecked {
       accountDetails.balance -= _amount;
@@ -250,17 +250,41 @@ library TwabLib {
     if (_targetTime < PERIOD_OFFSET) {
       return 0;
     }
-    uint256 offsetTargetTime = _targetTime - PERIOD_OFFSET;
     // if this is for an overflowed time period, return 0
-    if (offsetTargetTime > type(uint32).max) {
+    if (isShutdownAt(_targetTime, PERIOD_OFFSET)) {
       return 0;
     }
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
       _observations,
       _accountDetails,
-      PeriodOffsetRelativeTimestamp.wrap(uint32(offsetTargetTime))
+      PeriodOffsetRelativeTimestamp.wrap(uint32(_targetTime - PERIOD_OFFSET))
     );
     return prevOrAtObservation.balance;
+  }
+
+  /**
+   * @notice Returns whether the TwabController has been shutdown at the given timestamp
+   * If the twab is queried at or after this time, whether an absolute timestamp or time range, it will return 0.
+   * @param timestamp The timestamp to check
+   * @param PERIOD_OFFSET The offset of the first period
+   * @return True if the TwabController is shutdown at the given timestamp, false otherwise.
+   */
+  function isShutdownAt(
+    uint256 timestamp,
+    uint32 PERIOD_OFFSET
+  ) internal pure returns (bool) {
+    return timestamp > lastObservationAt(PERIOD_OFFSET);
+  }
+
+  /**
+   * @notice Computes the largest timestamp at which the TwabController can record a new observation.
+   * @param PERIOD_OFFSET The offset of the first period
+   * @return The largest timestamp at which the TwabController can record a new observation.
+   */
+  function lastObservationAt(
+    uint32 PERIOD_OFFSET
+  ) internal pure returns (uint256) {
+    return uint256(PERIOD_OFFSET) + type(uint32).max;
   }
 
   /**
@@ -286,13 +310,13 @@ library TwabLib {
       revert InvalidTimeRange(_startTime, _endTime);
     }
 
-    uint256 offsetStartTime = _startTime - PERIOD_OFFSET;
-    uint256 offsetEndTime = _endTime - PERIOD_OFFSET;
-
-    // if the either time has overflowed, then return 0.
-    if (offsetStartTime > type(uint32).max || offsetEndTime > type(uint32).max) {
+    // if the range extends into the shutdown period, return 0
+    if (isShutdownAt(_endTime, PERIOD_OFFSET)) {
       return 0;
     }
+
+    uint256 offsetStartTime = _startTime - PERIOD_OFFSET;
+    uint256 offsetEndTime = _endTime - PERIOD_OFFSET;
 
     ObservationLib.Observation memory endObservation = _getPreviousOrAtObservation(
       _observations,

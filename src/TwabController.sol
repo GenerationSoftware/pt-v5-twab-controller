@@ -172,6 +172,25 @@ contract TwabController {
   /* ============ External Read Functions ============ */
 
   /**
+   * @notice Returns whether the TwabController has been shutdown at the given timestamp
+   * If the twab is queried at or after this time, whether an absolute timestamp or time range, it will return 0.
+   * @dev This function will return true for any timestamp after the lastObservationAt()
+   * @param timestamp The timestamp to check
+   * @return True if the TwabController is shutdown at the given timestamp, false otherwise.
+   */
+  function isShutdownAt(uint256 timestamp) external view returns (bool) {
+    return TwabLib.isShutdownAt(timestamp, PERIOD_OFFSET);
+  }
+
+  /**
+   * @notice Computes the timestamp after which no more observations will be made.
+   * @return The largest timestamp at which the TwabController can record a new observation.
+   */
+  function lastObservationAt() external view returns (uint256) {
+    return TwabLib.lastObservationAt(PERIOD_OFFSET);
+  }
+
+  /**
    * @notice Loads the current TWAB Account data for a specific vault stored for a user.
    * @dev Note this is a very expensive function
    * @param vault the vault for which the data is being queried

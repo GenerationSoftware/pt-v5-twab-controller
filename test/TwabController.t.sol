@@ -145,6 +145,17 @@ contract TwabControllerTest is BaseTest {
     vm.stopPrank();
   }
 
+  function testIsShutdownAt() public {
+    assertEq(twabController.isShutdownAt(PERIOD_OFFSET), false, "at beginning");
+    assertEq(twabController.isShutdownAt(PERIOD_OFFSET + PERIOD_LENGTH), false, "after first period");
+    assertEq(twabController.isShutdownAt(type(uint32).max + uint256(PERIOD_OFFSET)), false, "at end");
+    assertEq(twabController.isShutdownAt(type(uint32).max + uint256(PERIOD_OFFSET) + 1), true, "after end");
+  }
+
+  function testLastObservationAt() public {
+    assertEq(twabController.lastObservationAt(), uint256(PERIOD_OFFSET) + type(uint32).max);
+  }
+
   function testGetBalanceAt_beforeHistoryStarted() public {
     // ensure times are finalized
     vm.warp(PERIOD_OFFSET + PERIOD_LENGTH);
