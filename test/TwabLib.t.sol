@@ -35,7 +35,7 @@ contract TwabLibTest is BaseTest {
   /* ============ increaseBalances ============ */
 
   function testIncreaseBalance_endOfTimerange() public {
-    uint256 timestamp = PERIOD_OFFSET + uint256(type(uint32).max);
+    uint256 timestamp = twabLibMock.lastObservationAt();
     vm.warp(timestamp);
     twabLibMock.increaseBalances(1000e18, 1000e18);
     vm.warp(uint256(type(uint48).max));
@@ -45,7 +45,7 @@ contract TwabLibTest is BaseTest {
   function testDecreaseBalance_endOfTimerange() public {
     vm.warp(PERIOD_OFFSET);
     twabLibMock.increaseBalances(1000e18, 1000e18);
-    uint256 timestamp = PERIOD_OFFSET + uint256(type(uint32).max);
+    uint256 timestamp = twabLibMock.lastObservationAt();
     vm.warp(timestamp);
     twabLibMock.decreaseBalances(100e18, 100e18, "revert message");
     vm.warp(uint256(type(uint48).max));
@@ -734,7 +734,7 @@ contract TwabLibTest is BaseTest {
   function testGetBalanceAt_endOfTimerange() public {
     twabLibMock.increaseBalances(0, 1e18);
     vm.warp(type(uint48).max);
-    assertEq(twabLibMock.getBalanceAt(PERIOD_OFFSET + uint256(type(uint32).max)), 1e18);
+    assertEq(twabLibMock.getBalanceAt(twabLibMock.lastObservationAt()), 1e18);
   }
 
   function testGetBalanceAt_outOfTimerange() public {

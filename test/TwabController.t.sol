@@ -148,12 +148,13 @@ contract TwabControllerTest is BaseTest {
   function testIsShutdownAt() public {
     assertEq(twabController.isShutdownAt(PERIOD_OFFSET), false, "at beginning");
     assertEq(twabController.isShutdownAt(PERIOD_OFFSET + PERIOD_LENGTH), false, "after first period");
-    assertEq(twabController.isShutdownAt(type(uint32).max + uint256(PERIOD_OFFSET)), false, "at end");
+    assertEq(twabController.isShutdownAt((type(uint32).max/PERIOD_LENGTH)*PERIOD_LENGTH + uint256(PERIOD_OFFSET)), false, "at end of last period");
+    assertEq(twabController.isShutdownAt(type(uint32).max + uint256(PERIOD_OFFSET)), true, "at end");
     assertEq(twabController.isShutdownAt(type(uint32).max + uint256(PERIOD_OFFSET) + 1), true, "after end");
   }
 
   function testLastObservationAt() public {
-    assertEq(twabController.lastObservationAt(), uint256(PERIOD_OFFSET) + type(uint32).max);
+    assertEq(twabController.lastObservationAt(), uint256(PERIOD_OFFSET) + (type(uint32).max/PERIOD_LENGTH)*PERIOD_LENGTH);
   }
 
   function testGetBalanceAt_beforeHistoryStarted() public {
@@ -946,6 +947,18 @@ contract TwabControllerTest is BaseTest {
     vm.startPrank(alice);
     twabController.delegate(mockVault, bob);
     assertEq(twabController.delegateOf(mockVault, alice), bob);
+  }
+
+  function testMint_lastObservation() public {
+    vm.startPrank(mockVault);
+    uint96 _amount = 1000e18;
+    uint lastAt = twabController.lastObservationAt();
+    console2.log("LAST AT", lastAt);
+    vm.warp(lastAt);
+    twabController.mint(alice, _amount);
+    vm.warp(lastAt + PERIOD_LENGTH);
+    assertEq(twabController.getBalanceAt(mockVault, alice, lastAt), _amount);
+    vm.stopPrank();
   }
 
   function testMint_toZero() public {
