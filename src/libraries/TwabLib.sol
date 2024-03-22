@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/console2.sol";
-
 import "ring-buffer-lib/RingBufferLib.sol";
 
 import { ObservationLib, MAX_CARDINALITY } from "./ObservationLib.sol";
@@ -252,10 +250,8 @@ library TwabLib {
     if (_targetTime < PERIOD_OFFSET) {
       return 0;
     }
-    console2.log("lastObservationAt", lastObservationAt(PERIOD_LENGTH, PERIOD_OFFSET));
     // if this is for an overflowed time period, return 0
     if (isShutdownAt(_targetTime, PERIOD_LENGTH, PERIOD_OFFSET)) {
-      console2.log("IS SHUTDOWN", _targetTime);
       return 0;
     }
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
