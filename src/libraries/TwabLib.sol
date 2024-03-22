@@ -109,7 +109,7 @@ library TwabLib {
     // record a new observation if the delegateAmount is non-zero and time has not overflowed.
     isObservationRecorded =
       _delegateAmount != uint96(0) &&
-      block.timestamp <= lastObservationAt(PERIOD_OFFSET);
+      block.timestamp <= lastObservationAt(PERIOD_LENGTH, PERIOD_OFFSET);
 
     accountDetails.balance += _amount;
     accountDetails.delegateBalance += _delegateAmount;
@@ -172,7 +172,7 @@ library TwabLib {
     // record a new observation if the delegateAmount is non-zero and time has not overflowed.
     isObservationRecorded =
       _delegateAmount != uint96(0) &&
-      block.timestamp <= lastObservationAt(PERIOD_OFFSET);
+      block.timestamp <= lastObservationAt(PERIOD_LENGTH, PERIOD_OFFSET);
 
     unchecked {
       accountDetails.balance -= _amount;
@@ -251,7 +251,7 @@ library TwabLib {
       return 0;
     }
     // if this is for an overflowed time period, return 0
-    if (isShutdownAt(_targetTime, PERIOD_OFFSET)) {
+    if (isShutdownAt(_targetTime, PERIOD_LENGTH, PERIOD_OFFSET)) {
       return 0;
     }
     ObservationLib.Observation memory prevOrAtObservation = _getPreviousOrAtObservation(
@@ -271,9 +271,10 @@ library TwabLib {
    */
   function isShutdownAt(
     uint256 timestamp,
+    uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET
   ) internal pure returns (bool) {
-    return timestamp > lastObservationAt(PERIOD_OFFSET);
+    return timestamp > lastObservationAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
   /**
@@ -282,9 +283,10 @@ library TwabLib {
    * @return The largest timestamp at which the TwabController can record a new observation.
    */
   function lastObservationAt(
+    uint32 PERIOD_LENGTH,
     uint32 PERIOD_OFFSET
   ) internal pure returns (uint256) {
-    return uint256(PERIOD_OFFSET) + type(uint32).max;
+    return uint256(PERIOD_OFFSET) + (type(uint32).max / PERIOD_LENGTH) * PERIOD_LENGTH;
   }
 
   /**
@@ -311,7 +313,7 @@ library TwabLib {
     }
 
     // if the range extends into the shutdown period, return 0
-    if (isShutdownAt(_endTime, PERIOD_OFFSET)) {
+    if (isShutdownAt(_endTime, PERIOD_LENGTH, PERIOD_OFFSET)) {
       return 0;
     }
 

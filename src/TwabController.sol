@@ -179,7 +179,7 @@ contract TwabController {
    * @return True if the TwabController is shutdown at the given timestamp, false otherwise.
    */
   function isShutdownAt(uint256 timestamp) external view returns (bool) {
-    return TwabLib.isShutdownAt(timestamp, PERIOD_OFFSET);
+    return TwabLib.isShutdownAt(timestamp, PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
   /**
@@ -187,7 +187,7 @@ contract TwabController {
    * @return The largest timestamp at which the TwabController can record a new observation.
    */
   function lastObservationAt() external view returns (uint256) {
-    return TwabLib.lastObservationAt(PERIOD_OFFSET);
+    return TwabLib.lastObservationAt(PERIOD_LENGTH, PERIOD_OFFSET);
   }
 
   /**

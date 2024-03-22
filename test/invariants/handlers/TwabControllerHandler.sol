@@ -320,7 +320,6 @@ contract TwabControllerHandler is CommonBase, StdCheats, StdUtils {
   function reduceFullRangeTwabs() external view returns (uint256, uint256) {
     uint256 vaultAcc = 0;
     uint256 actorAcc = 0;
-    ObservationLib.Observation memory newestActorObservation;
     ObservationLib.Observation memory newestObservation;
 
     // For Each Vault

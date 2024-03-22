@@ -160,4 +160,9 @@ contract TwabLibMock {
     bool isSafe = TwabLib.hasFinalized(PERIOD_LENGTH, PERIOD_OFFSET, _timestamp);
     return isSafe;
   }
+
+  function lastObservationAt() external view returns (uint) {
+    uint result = TwabLib.lastObservationAt(PERIOD_LENGTH, PERIOD_OFFSET);
+    return result;
+  }
 }
