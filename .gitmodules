@@ -9,4 +9,3 @@
 [submodule "lib/ring-buffer-lib"]
 	path = lib/ring-buffer-lib
 	url = https://github.com/generationsoftware/ring-buffer-lib
-	branch = prod-deploy-2
