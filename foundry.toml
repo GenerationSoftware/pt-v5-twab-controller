@@ -7,6 +7,8 @@ solc = "0.8.19"
 fs_permissions = [{ access = "read", path = "./broadcast"}]
 gas_reports = ["*"]
 no_match_test = "SLOW"
+memory_limit = 13421772800
+gas_limit = "18446744073709551615"
 
 [invariant]
 fail_on_revert = false
