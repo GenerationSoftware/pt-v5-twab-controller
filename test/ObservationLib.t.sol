@@ -90,7 +90,7 @@ contract ObservationLibTest is BaseTest {
   }
 
   // Outside of range
-  function testFailBinarySearch_OneItem_TargetBefore() public {
+  function test_Revert_If_BinarySearch_OneItem_TargetBefore() public {
     uint32[] memory t = new uint32[](1);
     t[0] = 10;
     observationLibMock.populateObservations(t);
@@ -133,7 +133,7 @@ contract ObservationLibTest is BaseTest {
   }
 
   // Outside of range
-  function testFailBinarySearch_OneItem_TargetAfter() public {
+  function test_Revert_If_BinarySearch_OneItem_TargetAfter() public {
     uint32[] memory t = new uint32[](1);
     t[0] = 10;
     observationLibMock.populateObservations(t);
